@@ -1,0 +1,27 @@
+# ────────────────────────────────────────────────────────────────
+# Pi Backend — deny ALL HTTP access via web server
+# ────────────────────────────────────────────────────────────────
+# This folder is NEVER served by WordPress. It contains a standalone
+# Python FastAPI app that runs in Docker / Railway, not through PHP.
+#
+# If WordPress is deployed to Apache shared hosting (cPanel etc.)
+# with this folder present, Apache would otherwise serve static files
+# from here — leaking .env, source code, prompts, etc.
+#
+# For nginx: add to your server block —
+#   location ^~ /wp-content/pi-backend/ { return 403; }
+# ────────────────────────────────────────────────────────────────
+
+# Apache 2.4+
+<IfModule mod_authz_core.c>
+    Require all denied
+</IfModule>
+
+# Apache 2.2 fallback
+<IfModule !mod_authz_core.c>
+    Order deny,allow
+    Deny from all
+</IfModule>
+
+# Disable directory listing just in case
+Options -Indexes
