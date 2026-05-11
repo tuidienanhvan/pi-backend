@@ -49,9 +49,9 @@ async def main(args: argparse.Namespace) -> None:
 
 if __name__ == "__main__":
     p = argparse.ArgumentParser(description="Create a Pi license")
-    p.add_argument("--plugin", required=True, help="e.g. pi-seo-pro, pi-dashboard-pro")
+    p.add_argument("--plugin", default="pi-api", help="e.g. pi-api")
     p.add_argument("--email", required=True)
-    p.add_argument("--tier", choices=["free", "pro", "agency"], default="pro")
+    p.add_argument("--tier", choices=["free", "pro", "max"], default="pro")
     p.add_argument("--max-sites", type=int, default=1)
     p.add_argument("--expires-days", type=int, default=365)
     p.add_argument("--name", default="")

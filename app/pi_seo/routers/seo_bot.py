@@ -72,10 +72,10 @@ async def bulk_generate(
     db: DbSession,  # noqa: ARG001
 ) -> SeoBotBulkResponse:
     """Queue bulk AI generation — runs in Celery worker, returns task_id."""
-    if lic.tier not in ("pro", "agency"):
+    if lic.tier not in ("pro", "max", "enterprise"):
         from app.core.exceptions import LicenseInvalid
 
-        raise LicenseInvalid("Bulk generation requires Pro or Agency tier")
+        raise LicenseInvalid("Bulk generation requires Pro or Max tier")
 
     from app.shared.tasks import seo_bot_bulk_generate
 

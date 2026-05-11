@@ -49,6 +49,9 @@ dependencies = [
     "python-slugify>=8.0.4",
     "orjson>=3.10.0",
     "tenacity>=9.0.0",
+    "stripe>=10.0.0",
+    "sqladmin>=0.21.0",
+    "itsdangerous>=2.2.0",
 ]
 
 [project.optional-dependencies]

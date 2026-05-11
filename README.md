@@ -77,26 +77,7 @@ pi-backend/
 │   │       ├── complete.py        #    POST /v1/ai/complete
 │   │       └── tokens.py          #    /wallet, /ledger, /topup/*, /providers
 │   │
-│   ├── pi_seo/                    # 🎯 Pi SEO Pro
-│   │   ├── schemas.py             #    Merged DTOs (bot + audit + schema)
-│   │   ├── prompts.py             #    🔒 SEO Bot prompts
-│   │   ├── data/
-│   │   │   ├── audit_weights.py   #    🔒 100-point rules
-│   │   │   └── schema_templates.py #   🔒 Curated JSON-LD library
-│   │   ├── services/
-│   │   │   ├── seo_bot.py
-│   │   │   ├── html_analyzer.py
-│   │   │   └── scorer.py
-│   │   └── routers/
-│   │       ├── seo_bot.py         #    /v1/seo/bot/*
-│   │       ├── audit.py           #    /v1/seo/audit/*
-│   │       └── schema.py          #    /v1/seo/schema/*
-│   │
-│   ├── pi_chatbot/                # 💬 Pi Chatbot Pro (scaffold)
-│   ├── pi_leads/                  # 📋 Pi Leads Pro (scaffold)
-│   ├── pi_analytics/              # 📊 Pi Analytics Pro (scaffold)
-│   ├── pi_performance/            # ⚡ Pi Performance Pro (scaffold)
-│   └── pi_dashboard/              # 🏠 Pi Dashboard (scaffold)
+│   └── pi_api/                    # 🎯 Pi Unified API (SEO, Chatbot, Leads, etc.)
 │
 ├── migrations/
 │   └── versions/
@@ -130,14 +111,8 @@ pi-backend/
 
 | WordPress plugin | Folder in pi-backend | Revenue tier |
 |---|---|---|
-| `pi-dashboard` | `app/pi_dashboard/` | FREE (platform) |
-| `pi-ai-provider` | (backbone, no backend module) | FREE (internal) |
-| `pi-seo` | `app/pi_seo/` | **Pro $49-99/yr** |
-| `pi-chatbot` | `app/pi_chatbot/` | **Pro $29/mo SaaS** |
-| `pi-leads` | `app/pi_leads/` | **Pro $39-79/yr** |
-| `pi-analytics` | `app/pi_analytics/` | **Pro $29-49/yr** |
-| `pi-performance` | `app/pi_performance/` | **Pro $29-49/yr** |
-| — (backend-only) | `app/pi_ai_cloud/` | **💰 Tokens $10/100k** ← PRIMARY |
+| `pi-api` | `app/pi_api/` | **Unified Plugin (Platform)** |
+| — (backend-only) | `app/pi_ai_cloud/` | **3 Tiers: Free, Pro, Max** |
 
 ---
 
@@ -155,18 +130,9 @@ pi-backend/
 /v1/ai/wallet                                              Customer balance
 /v1/ai/ledger                                              Transaction history
 /v1/ai/topup/{checkout, packs}                             Stripe integration
-/v1/ai/stripe/webhook                                      Event handler
 /v1/ai/providers                                           Transparency list
 
-/v1/seo/bot/{generate, bulk, status/:id}                   Pi SEO Pro — AI
-/v1/seo/audit/{run, content}                               Pi SEO Pro — scoring
-/v1/seo/schema/{templates, templates/:id}                  Pi SEO Pro — library
-
-/v1/chatbot/*                                              Scaffolded (Phase 2)
-/v1/leads/*                                                Scaffolded (Phase 2)
-/v1/analytics/*                                            Scaffolded (Phase 2)
-/v1/perf/*                                                 Scaffolded (Phase 2)
-/v1/dashboard/*                                            Scaffolded (Phase 2)
+/v1/pi/v1/*                                                Unified Plugin Endpoints (SEO, Chat, Leads, etc.)
 ```
 
 ---
@@ -194,6 +160,35 @@ curl http://localhost:8000/v1/ai/wallet \
 ```
 
 See `docs/QUICKSTART.md` for full walkthrough.
+
+---
+
+## Admin DB Access (SQLAdmin)
+
+Browse: `http://localhost:8000/admin/db`
+
+This is a direct database admin UI for internal development and debugging. Do not expose it to the public internet in production; put it behind VPN/internal network controls.
+
+Login:
+- Username: any value
+- Password: paste a user JWT with `is_admin=true`
+
+Get an admin JWT:
+
+```bash
+curl -X POST http://localhost:8000/v1/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"admin@pi.local","password":"..."}' | jq -r .access_token
+```
+
+Set a strong session secret before running:
+
+```bash
+openssl rand -hex 32
+# then set SQLADMIN_SESSION_SECRET=<generated-value>
+```
+
+Registered tables include tenants, tenant tokens, tenant token transactions, licenses, sites, users, AI wallets, AI ledgers, AI providers, AI usage, usage logs, and admin audit logs. Secret fields such as password hashes are excluded from list/forms.
 
 ---
 

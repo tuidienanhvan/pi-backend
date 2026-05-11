@@ -1,0 +1,108 @@
+{% extends "sqladmin/base.html" %}
+{% from 'sqladmin/_macros.html' import display_menu %}
+
+{% block head %}
+<link rel="icon" href="/static/favicon.svg">
+<link rel="shortcut icon" href="/static/favicon.svg">
+<style>
+  .glass-sidebar {
+    background: rgba(18, 20, 24, 0.7) !important;
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border-right: 1px solid rgba(255, 255, 255, 0.1) !important;
+  }
+  .glass-topbar {
+    background: rgba(11, 13, 15, 0.7) !important;
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1) !important;
+  }
+</style>
+{% endblock %}
+
+{% block body %}
+<div class="pi-shell">
+  <!-- ===== SIDEBAR ===== -->
+  <aside class="pi-sidebar glass-sidebar" id="pi-sidebar">
+    <div class="pi-sidebar-brand">
+      <a href="{{ url_for('admin:index') }}" class="pi-brand-link" style="display:flex; align-items:center; gap:12px; text-decoration:none;">
+        <img src="/static/favicon.svg" alt="Pi Admin Logo" width="32" height="32" style="border-radius: 6px;" />
+        <div class="pi-brand-text">
+          <span class="pi-brand-name" style="font-weight: 700; font-size: 18px; color: var(--pi-text);">Pi Admin</span>
+          <span class="pi-brand-env" style="font-size: 12px; color: var(--pi-text-muted);">DB Control Panel</span>
+        </div>
+      </a>
+    </div>
+
+    <!-- Divider -->
+    <div class="pi-sidebar-divider"></div>
+
+    <!-- Nav label -->
+    <div class="pi-nav-section-label">Navigation</div>
+
+    <!-- Menu from sqladmin -->
+    <nav class="pi-nav" id="navbar-menu">
+      {{ display_menu(admin._menu, request) }}
+    </nav>
+
+    <!-- Spacer + logout -->
+    <div class="pi-sidebar-footer">
+      <div class="pi-sidebar-divider"></div>
+      {% if admin.authentication_backend %}
+      <a href="{{ request.url_for('admin:logout') }}" class="pi-logout-btn">
+        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+          <polyline points="16 17 21 12 16 7"/>
+          <line x1="21" y1="12" x2="9" y2="12"/>
+        </svg>
+        <span>Logout</span>
+      </a>
+      {% endif %}
+    </div>
+  </aside>
+
+  <!-- ===== MAIN CONTENT ===== -->
+  <div class="pi-main">
+    <!-- Top topbar -->
+    <header class="pi-topbar glass-topbar">
+      <button class="pi-sidebar-toggle" onclick="toggleSidebar()" aria-label="Toggle sidebar">
+        <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <line x1="3" y1="6" x2="21" y2="6"/>
+          <line x1="3" y1="12" x2="21" y2="12"/>
+          <line x1="3" y1="18" x2="21" y2="18"/>
+        </svg>
+      </button>
+      <div class="pi-topbar-breadcrumb">
+        {% block content_header %}
+        <div class="pi-page-title-area">
+          <h1 class="pi-page-title">{{ title }}</h1>
+          {% if subtitle %}
+          <p class="pi-page-subtitle">{{ subtitle }}</p>
+          {% endif %}
+        </div>
+        {% endblock %}
+      </div>
+      <div class="pi-topbar-right">
+        <div class="pi-topbar-badge">
+          <span class="pi-status-dot"></span>
+          Live
+        </div>
+      </div>
+    </header>
+
+    <!-- Page content -->
+    <main class="pi-content">
+      {% block content %} {% endblock %}
+      {% block flash %}
+      {% include 'sqladmin/flash.html' %}
+      {% endblock %}
+    </main>
+  </div>
+</div>
+
+<script>
+  function toggleSidebar() {
+    document.getElementById('pi-sidebar').classList.toggle('collapsed');
+  }
+</script>
+{% endblock %}

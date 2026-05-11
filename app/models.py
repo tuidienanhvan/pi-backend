@@ -20,8 +20,10 @@ from app.shared.auth.models import User
 from app.shared.license.models import License, Site
 from app.shared.updates.models import PluginRelease
 from app.shared.usage import UsageLog
+from app.saas.models import AdminAuditLog, Tenant, Token, TokenTransaction
 
 __all__ = [
+    "AdminAuditLog",
     "AiPackage",
     "AiProvider",
     "AiProviderKey",
@@ -33,6 +35,9 @@ __all__ = [
     "LicensePackage",
     "PluginRelease",
     "Site",
+    "Tenant",
+    "Token",
+    "TokenTransaction",
     "TokenLedger",
     "TokenWallet",
     "UsageLog",

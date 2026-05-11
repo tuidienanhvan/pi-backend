@@ -17,7 +17,8 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import ORJSONResponse
+from fastapi.responses import JSONResponse
+import os
 
 from app import __version__
 from app.core.config import settings
@@ -32,6 +33,11 @@ from app.shared.health import router as health_router
 from app.shared.license.router import router as license_router
 from app.shared.telemetry.router import router as telemetry_router
 from app.shared.updates.router import router as updates_router
+from app.shared.license.usage_router import router as usage_report_router
+
+from app.saas.admin_router import router as saas_admin_router
+from app.saas.auth_router import router as saas_auth_router
+from app.billing.router import router as billing_router
 
 # Admin domain (requires admin JWT)
 from app.admin.routers.overview import router as admin_overview_router
@@ -87,7 +93,6 @@ app = FastAPI(
         "Plugin-specific endpoints under /v1/{plugin-slug}/*."
     ),
     version=__version__,
-    default_response_class=ORJSONResponse,
     lifespan=lifespan,
     docs_url="/docs" if not settings.is_production else None,
     redoc_url="/redoc" if not settings.is_production else None,
@@ -106,13 +111,15 @@ app.add_middleware(
 )
 
 register_exception_handlers(app)
-
-# Shared
 app.include_router(health_router, tags=["health"])
 app.include_router(auth_router,      prefix="/v1/auth",      tags=["shared: auth"])
 app.include_router(license_router,   prefix="/v1/license",   tags=["shared: license"])
 app.include_router(updates_router,   prefix="/v1/updates",   tags=["shared: updates"])
 app.include_router(telemetry_router, prefix="/v1/telemetry", tags=["shared: telemetry"])
+app.include_router(usage_report_router, prefix="/v1/usage", tags=["shared: usage"])
+
+app.include_router(saas_auth_router, prefix="/auth", tags=["saas: pi-api auth"])
+app.include_router(billing_router, prefix="/v1/billing", tags=["billing: subscriptions"])
 
 # Admin (all under /v1/admin, require admin JWT)
 app.include_router(admin_overview_router,  prefix="/v1/admin", tags=["admin: overview"])
@@ -127,6 +134,7 @@ app.include_router(admin_keys_router,      prefix="/v1/admin", tags=["admin: key
 app.include_router(admin_packages_router,  prefix="/v1/admin", tags=["admin: packages"])
 app.include_router(admin_audit_router,     prefix="/v1/admin", tags=["admin: audit"])
 app.include_router(admin_cron_router,      prefix="/v1/admin", tags=["admin: cron"])
+app.include_router(saas_admin_router,      prefix="/v1/admin/saas", tags=["saas: admin"])
 
 # Pi AI Cloud (primary revenue)
 app.include_router(ai_complete_router, prefix="/v1/ai", tags=["pi-ai-cloud: complete"])
@@ -159,12 +167,7 @@ async def root() -> dict[str, object]:
         "plugins": {
             "shared": ["auth", "license", "updates", "telemetry"],
             "admin": ["overview", "licenses", "users", "providers", "usage", "revenue", "releases"],
-            "pi-ai-cloud": ["complete", "tokens (primary revenue)"],
-            "pi-seo": ["bot", "audit", "schema"],
-            "pi-chatbot": ["scaffold"],
-            "pi-leads": ["scaffold"],
-            "pi-analytics": ["scaffold"],
-            "pi-performance": ["scaffold"],
-            "pi-dashboard": ["scaffold"],
+            "pi-ai-cloud": ["complete", "tokens (Free, Pro, Max)"],
+            "pi-api": ["Unified Plugin (SEO, Chatbot, Leads, Analytics, Performance)"],
         },
     }

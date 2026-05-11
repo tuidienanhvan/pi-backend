@@ -268,9 +268,9 @@ SCHEMA_TEMPLATES: list[SchemaTemplate] = [
 def templates_for_tier(tier: str) -> list[SchemaTemplate]:
     """Return templates visible to this tier.
 
-    Tier hierarchy: agency > pro > free
+    Tier hierarchy: max > pro > free
     """
-    if tier == "agency":
+    if tier in ("max", "enterprise"):
         return SCHEMA_TEMPLATES
     if tier == "pro":
         return [t for t in SCHEMA_TEMPLATES if t.tier_required in ("free", "pro")]

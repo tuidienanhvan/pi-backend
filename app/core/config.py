@@ -38,10 +38,12 @@ class Settings(BaseSettings):
     jwt_secret: str = Field(..., min_length=32)
     jwt_algorithm: str = "HS256"
     jwt_expire_minutes: int = 10080  # 7 days
+    tenant_jwt_expire_minutes: int = 15
 
     # ─── License ──────────────────────────────────────────
     license_key_prefix: str = "pi_"
-    license_default_tier: Literal["free", "pro", "agency"] = "free"
+    license_default_tier: Literal["free", "pro", "max", "enterprise"] = "free"
+    tenant_license_key_pattern: str = r"^[A-Z0-9]{4,8}-[A-Z0-9]{5,8}-[A-Z0-9]{5}-[A-Z0-9]{5}$"
 
     # ─── AI ───────────────────────────────────────────────
     anthropic_api_key: str = ""
@@ -54,9 +56,9 @@ class Settings(BaseSettings):
     google_indexing_service_account_json: str = ""  # path to JSON credential
 
     # ─── Rate limits (per-month quotas) ───────────────────
-    rate_limit_free_per_month: int = 20
-    rate_limit_pro_per_month: int = 500
-    rate_limit_agency_per_month: int = 5000
+    rate_limit_free_per_month: int = 5_000
+    rate_limit_pro_per_month: int = 100_000
+    rate_limit_max_per_month: int = 500_000
     rate_limit_burst_per_minute: int = 10
 
     # ─── Plugin updates ───────────────────────────────────
@@ -86,7 +88,8 @@ class Settings(BaseSettings):
         return {
             "free": self.rate_limit_free_per_month,
             "pro": self.rate_limit_pro_per_month,
-            "agency": self.rate_limit_agency_per_month,
+            "max": self.rate_limit_max_per_month,
+            "enterprise": -1,
         }
 
 

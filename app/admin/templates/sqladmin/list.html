@@ -1,0 +1,301 @@
+{% extends "sqladmin/layout.html" %}
+
+{% block content_header %}
+<div class="pi-page-title-area">
+  <div class="pi-page-title-row">
+    <div>
+      <h1 class="pi-page-title">{{ model_view.name_plural }}</h1>
+      <p class="pi-page-subtitle">{{ pagination.count }} record{% if pagination.count != 1 %}s{% endif %} total</p>
+    </div>
+    <div class="pi-header-actions">
+      {% if model_view.can_export %}
+      <div class="dropdown">
+        <button class="pi-btn pi-btn-ghost pi-btn-sm dropdown-toggle" id="exportDropdown"
+                data-bs-toggle="dropdown" aria-expanded="false">
+          <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+            <polyline points="7 10 12 15 17 10"/>
+            <line x1="12" y1="15" x2="12" y2="3"/>
+          </svg>
+          Export
+        </button>
+        <ul class="dropdown-menu pi-dropdown-menu" aria-labelledby="exportDropdown">
+          {% for export_type in model_view.export_types %}
+          <li>
+            <a class="pi-dropdown-item"
+               href="{{ url_for('admin:export', identity=model_view.identity, export_type=export_type) }}">
+              {{ export_type | upper }}
+            </a>
+          </li>
+          {% endfor %}
+        </ul>
+      </div>
+      {% endif %}
+      {% if model_view.can_create %}
+      <a href="{{ url_for('admin:create', identity=model_view.identity) }}" class="pi-btn pi-btn-primary pi-btn-sm">
+        <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+        </svg>
+        New {{ model_view.name }}
+      </a>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="pi-list-container">
+
+  <!-- Toolbar -->
+  <div class="pi-toolbar">
+    <!-- Actions dropdown -->
+    <div class="pi-toolbar-left">
+      <div class="dropdown">
+        <button {% if not model_view.can_delete and not model_view._custom_actions_in_list %}disabled{% endif %}
+                class="pi-btn pi-btn-ghost pi-btn-sm dropdown-toggle" id="actionsDropdown"
+                data-bs-toggle="dropdown" aria-expanded="false">
+          <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <circle cx="12" cy="5" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="12" cy="19" r="1"/>
+          </svg>
+          Actions
+        </button>
+        {% if model_view.can_delete or model_view._custom_actions_in_list %}
+        <ul class="dropdown-menu pi-dropdown-menu" aria-labelledby="actionsDropdown">
+          {% if model_view.can_delete %}
+          <li>
+            <a class="pi-dropdown-item pi-dropdown-item--danger" id="action-delete" href="#"
+               data-name="{{ model_view.name }}"
+               data-url="{{ url_for('admin:delete', identity=model_view.identity) }}"
+               data-bs-toggle="modal" data-bs-target="#modal-delete">
+              <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <polyline points="3 6 5 6 21 6"/>
+                <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
+                <path d="M10 11v6"/><path d="M14 11v6"/>
+              </svg>
+              Delete selected
+            </a>
+          </li>
+          {% endif %}
+          {% for custom_action, label in model_view._custom_actions_in_list.items() %}
+          <li>
+            <a class="pi-dropdown-item" id="action-custom-{{ custom_action }}" href="#"
+               data-url="{{ model_view._url_for_action(request, custom_action) }}">{{ label }}</a>
+          </li>
+          {% endfor %}
+        </ul>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- Search -->
+    <div class="pi-toolbar-right">
+      {% if model_view.column_searchable_list %}
+      <div class="pi-search-wrap">
+        <svg class="pi-search-icon" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+        </svg>
+        <input id="search-input" type="text" class="pi-search-input form-control"
+               data-search-auto-submit="{{ 'true' if model_view.search_auto_submit else 'false' }}"
+               placeholder="Search {{ model_view.name_plural | lower }}…"
+               value="{{ request.query_params.get('search', '') }}">
+        <button id="search-button" class="pi-search-btn" type="button" aria-label="Search">
+          <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <polyline points="9 18 15 12 9 6"/>
+          </svg>
+        </button>
+        {% if request.query_params.get('search') %}
+        <button id="search-reset" class="pi-search-clear" type="button" aria-label="Clear">
+          <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+          </svg>
+        </button>
+        {% endif %}
+      </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Error banner -->
+  {% if error %}
+  <div class="pi-alert pi-alert--danger" role="alert">
+    <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+      <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+    </svg>
+    {{ error }}
+  </div>
+  {% endif %}
+
+  <!-- Table -->
+  {% block model_list_table %}
+  <div class="pi-table-wrap">
+    <table class="pi-table table card-table table-vcenter">
+      <thead>
+        <tr>
+          <th class="pi-th pi-th--check">
+            <input class="pi-checkbox form-check-input m-0 align-middle" type="checkbox" id="select-all">
+          </th>
+          <th class="pi-th pi-th--actions">Actions</th>
+          {% for name in model_view._list_prop_names %}
+          {% set label = model_view._column_labels.get(name, name) %}
+          <th class="pi-th">
+            {% if name in model_view._sort_fields %}
+              {% if request.query_params.get("sortBy") == name and request.query_params.get("sort") == "asc" %}
+              <a class="pi-sort-link pi-sort-link--asc" href="{{ request.url.include_query_params(sort='desc') }}">
+                {{ label }}
+                <svg width="10" height="10" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M12 5v14M5 12l7-7 7 7"/></svg>
+              </a>
+              {% elif request.query_params.get("sortBy") == name and request.query_params.get("sort") == "desc" %}
+              <a class="pi-sort-link pi-sort-link--desc" href="{{ request.url.include_query_params(sort='asc') }}">
+                {{ label }}
+                <svg width="10" height="10" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M12 19V5M5 12l7 7 7-7"/></svg>
+              </a>
+              {% else %}
+              <a class="pi-sort-link" href="{{ request.url.include_query_params(sortBy=name, sort='asc') }}">
+                {{ label }}
+                <svg width="10" height="10" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" opacity="0.4"><path d="M7 15l5 5 5-5M7 9l5-5 5 5"/></svg>
+              </a>
+              {% endif %}
+            {% else %}
+            {{ label }}
+            {% endif %}
+          </th>
+          {% endfor %}
+        </tr>
+      </thead>
+      <tbody>
+        {% if not pagination.rows %}
+        <tr>
+          <td colspan="{{ model_view._list_prop_names|length + 2 }}" class="pi-empty-state">
+            <div class="pi-empty-icon">
+              <svg width="40" height="40" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" opacity="0.3">
+                <rect x="2" y="3" width="20" height="14" rx="2" ry="2"/>
+                <line x1="8" y1="21" x2="16" y2="21"/>
+                <line x1="12" y1="17" x2="12" y2="21"/>
+              </svg>
+            </div>
+            <p class="pi-empty-text">No {{ model_view.name_plural | lower }} found</p>
+            {% if model_view.can_create %}
+            <a href="{{ url_for('admin:create', identity=model_view.identity) }}" class="pi-btn pi-btn-primary pi-btn-sm" style="margin-top:12px">
+              + Create first {{ model_view.name }}
+            </a>
+            {% endif %}
+          </td>
+        </tr>
+        {% endif %}
+
+        {% for row in pagination.rows %}
+        <tr class="pi-tr">
+          <td class="pi-td pi-td--check">
+            <input type="hidden" value="{{ get_object_identifier(row) }}">
+            <input class="pi-checkbox form-check-input m-0 align-middle select-box" type="checkbox">
+          </td>
+          <td class="pi-td pi-td--actions">
+            <div class="pi-row-actions">
+              {% if model_view.check_can_view_details(request, row) %}
+              <a href="{{ model_view._build_url_for('admin:details', request, row) }}"
+                 class="pi-action-btn" title="View details" aria-label="View">
+                <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                  <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>
+                </svg>
+              </a>
+              {% endif %}
+              {% if model_view.check_can_edit(request, row) %}
+              <a href="{{ model_view._build_url_for('admin:edit', request, row) }}"
+                 class="pi-action-btn" title="Edit" aria-label="Edit">
+                <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                  <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                  <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                </svg>
+              </a>
+              {% endif %}
+              {% if model_view.check_can_delete(request, row) %}
+              <a href="#" class="pi-action-btn pi-action-btn--danger"
+                 data-name="{{ model_view.name }}" data-pk="{{ get_object_identifier(row) }}"
+                 data-url="{{ model_view._url_for_delete(request, row) }}"
+                 data-bs-toggle="modal" data-bs-target="#modal-delete"
+                 title="Delete" aria-label="Delete">
+                <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                  <polyline points="3 6 5 6 21 6"/>
+                  <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
+                  <path d="M10 11v6"/><path d="M14 11v6"/>
+                </svg>
+              </a>
+              {% endif %}
+            </div>
+          </td>
+
+          {% for name in model_view._list_prop_names %}
+          {% set value, formatted_value = model_view.get_list_value(row, name) %}
+          {% if name in model_view._relation_names %}
+          <td class="pi-td">
+            {% if is_list(value) %}
+              {% for elem, formatted_elem in zip(value, formatted_value) %}
+              <a class="pi-link" href="{{ model_view._build_url_for('admin:details', request, elem) }}">{{ formatted_elem }}</a>{% if not loop.last %}, {% endif %}
+              {% endfor %}
+            {% else %}
+              <a class="pi-link" href="{{ model_view._url_for_details_with_prop(request, row, name) }}">{{ formatted_value }}</a>
+            {% endif %}
+          </td>
+          {% else %}
+          <td class="pi-td">
+            {% if name in ['status', 'health_status', 'subscription_status', 'tier', 'plan'] %}
+              {% set tone = 'success' if value in ['active', 'healthy', 'paid', 'enterprise', 'pro'] else 'warning' if value in ['degraded', 'pending', 'trial'] else 'danger' if value in ['inactive', 'expired', 'cancelled', 'failed'] else 'neutral' %}
+              {% set display_val = formatted_value if formatted_value and formatted_value != 'None' else (value | string | title if value and value != 'None' else '—') %}
+              <span class="pi-badge pi-badge--{{ tone }}">
+                {% if display_val != '—' %}<span class="pi-badge-dot"></span>{% endif %}
+                {{ display_val }}
+              </span>
+            {% elif name in ['created_at', 'updated_at', 'expires_at'] and formatted_value %}
+              <span class="pi-timestamp" title="{{ formatted_value }}">{{ formatted_value | string | truncate(19, True, '') }}</span>
+            {% else %}
+              <span class="pi-cell-text">{{ formatted_value }}</span>
+            {% endif %}
+          </td>
+          {% endif %}
+          {% endfor %}
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endblock %}
+
+  <!-- Pagination footer -->
+  <div class="pi-table-footer">
+    <p class="pi-pagination-info">
+      Showing
+      <strong>{{ ((pagination.page - 1) * pagination.page_size) + 1 }}</strong>
+      –
+      <strong>{{ min(pagination.page * pagination.page_size, pagination.count) }}</strong>
+      of
+      <strong>{{ pagination.count }}</strong>
+    </p>
+    <nav class="pi-pagination" aria-label="Pagination">
+      <a class="pi-page-btn {% if not pagination.has_previous %}disabled{% endif %}"
+         href="{{ pagination.previous_page.url if pagination.has_previous else '#' }}"
+         aria-label="Previous page">
+        <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <polyline points="15 18 9 12 15 6"/>
+        </svg>
+      </a>
+      {% for page_control in pagination.page_controls %}
+      <a class="pi-page-btn {% if page_control.number == pagination.page %}active{% endif %}"
+         href="{{ page_control.url }}">{{ page_control.number }}</a>
+      {% endfor %}
+      <a class="pi-page-btn {% if not pagination.has_next %}disabled{% endif %}"
+         href="{{ pagination.next_page.url if pagination.has_next else '#' }}"
+         aria-label="Next page">
+        <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <polyline points="9 18 15 12 9 6"/>
+        </svg>
+      </a>
+    </nav>
+  </div>
+
+</div><!-- /.pi-list-container -->
+
+{% if model_view.can_delete %}
+{% include 'sqladmin/modals/delete.html' %}
+{% endif %}
+{% endblock %}

@@ -87,7 +87,7 @@ async def delete_package(
     await db.flush()
 
 
-# ─── License ↔ Package assignment ────────────────────────
+# ─── License  Package assignment ────────────────────────
 
 
 @router.get("/licenses/{license_id}/package", response_model=AdminLicensePackageItem | None)

@@ -133,7 +133,7 @@ class AdminPackagePatch(BaseModel):
     is_active: Optional[bool] = None
 
 
-# ─── License ↔ Package ──────────────────────────────────
+# ─── License  Package ──────────────────────────────────
 
 class AdminLicensePackageItem(BaseModel):
     license_id: int

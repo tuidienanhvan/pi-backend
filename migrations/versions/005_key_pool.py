@@ -55,7 +55,7 @@ def upgrade() -> None:
     # 2. ai_packages — customer-facing subscription tiers
     op.create_table(
         "ai_packages",
-        sa.Column("slug", sa.String(32), primary_key=True),  # 'free'|'starter'|'pro'|'agency'|'enterprise'
+        sa.Column("slug", sa.String(32), primary_key=True),  # 'free'|'starter'|'pro'|'max'|'enterprise'
         sa.Column("display_name", sa.String(64), nullable=False),
         sa.Column("description", sa.String(500), nullable=False, server_default=""),
         sa.Column("price_cents_monthly", sa.Integer(), nullable=False, server_default="0"),

@@ -10,14 +10,22 @@ from pydantic import BaseModel
 
 class AdminOverviewResponse(BaseModel):
     revenue_30d: float
+    revenue_90d: float
+    revenue_ytd: float
     upstream_cost_30d: float
     margin_pct: float
     active_licenses: int
+    new_licenses_7d: int
     tokens_spent_30d: int
+    projected_tokens_month_end: int
     total_providers: int
     healthy_providers: int
     down_providers: int
+    keys_total: int
+    keys_available: int
+    keys_allocated: int
     top_plugins: list[dict]
+    expiring_licenses: list[dict] = []
 
 
 # ─── Licenses ──────────────────────────────────────────
@@ -88,11 +96,18 @@ class AdminUserItem(BaseModel):
     total_spent_cents: int
     created_at: datetime
     last_login_at: Optional[datetime] = None
+    application_password: Optional[str] = None
+    site_url: Optional[str] = None
 
 
 class AdminUsersResponse(BaseModel):
     items: list[AdminUserItem]
     total: int
+
+
+class AdminUserProfilePatch(BaseModel):
+    application_password: Optional[str] = None
+    site_url: Optional[str] = None
 
 
 # ─── Providers ─────────────────────────────────────────

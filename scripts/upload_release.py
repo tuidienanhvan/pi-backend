@@ -84,7 +84,7 @@ if __name__ == "__main__":
     p.add_argument("--plugin", required=True, help="e.g. pi-seo, pi-dashboard")
     p.add_argument("--version", required=True, help="semver e.g. 1.3.0")
     p.add_argument("--zip", required=True, help="path to built ZIP")
-    p.add_argument("--tier", choices=["free", "pro", "agency"], default="free")
+    p.add_argument("--tier", choices=["free", "pro", "max"], default="free")
     p.add_argument("--changelog", default="")
     p.add_argument("--changelog-file", default="")
     p.add_argument("--min-php", default="8.3")

@@ -107,8 +107,10 @@ async def download(
 # ─── Helpers ────────────────────────────────────────────────
 def _tiers_visible(tier: str) -> list[str]:
     """Higher tiers can download lower-tier releases."""
-    if tier == "agency":
-        return ["free", "pro", "agency"]
+    if tier == "enterprise":
+        return ["free", "pro", "max", "enterprise"]
+    if tier == "max":
+        return ["free", "pro", "max"]
     if tier == "pro":
         return ["free", "pro"]
     return ["free"]

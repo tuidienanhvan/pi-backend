@@ -47,6 +47,7 @@ async def verify(
         success=True,
         tier=lic.tier,  # type: ignore[arg-type]
         status=lic.status,  # type: ignore[arg-type]
+        email=lic.email,
         expires_at=lic.expires_at,
         features=features,
     )
@@ -80,6 +81,11 @@ async def activate(
         activated_sites=count,
         max_sites=lic.max_sites,
         message="Activated" if created else "Reactivated",
+        jwt=svc.issue_jwt(lic)[0],
+        email=lic.email, # type: ignore
+        tier=lic.tier,
+        features=_features_for_tier(lic.tier),
+        expires_in=svc.issue_jwt(lic)[1],
     )
 
 
@@ -152,10 +158,11 @@ def _features_for_tier(tier: str) -> list[str]:
         "gsc_extended",
         "mega_importer",
     ]
-    agency = pro + [
+    max_tier = pro + [
         "bulk_ai",
         "api_access",
         "white_label",
         "multisite_unlimited",
     ]
-    return {"free": base, "pro": pro, "agency": agency}.get(tier, base)
+    enterprise = max_tier + ["enterprise_support", "custom_limits"]
+    return {"free": base, "pro": pro, "max": max_tier, "enterprise": enterprise}.get(tier, base)

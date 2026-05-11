@@ -139,6 +139,24 @@ class LicenseService:
         await self.db.flush()
         return log
 
+    async def register_credentials(self, email: str, domain: str, app_pass: str) -> bool:
+        """Link an Application Password to a site owned by this email."""
+        domain = self._normalise_domain(domain)
+        # Find site that belongs to any license of this email
+        q = (
+            select(Site)
+            .join(License, License.id == Site.license_id)
+            .where(License.email == email, Site.domain == domain)
+        )
+        result = await self.db.execute(q)
+        site = result.scalar_one_or_none()
+        if not site:
+            return False
+
+        site.app_pass = app_pass
+        await self.db.flush()
+        return True
+
     # ─── Helpers ─────────────────────────────────────────
     @staticmethod
     def _normalise_domain(site_url: str) -> str:

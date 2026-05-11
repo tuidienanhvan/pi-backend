@@ -21,7 +21,7 @@ class PluginRelease(Base, TimestampMixin):
     # Semver: "1.3.0"
 
     tier_required: Mapped[str] = mapped_column(String(16), default="free")
-    # "free" = anyone can download; "pro"/"agency" = license tier gate
+    # "free" = anyone can download; "pro"/"max" = license tier gate
 
     zip_path: Mapped[str] = mapped_column(String(500), nullable=False)
     # Relative path under UPDATES_STORAGE_PATH

@@ -1,0 +1,402 @@
+{% extends "sqladmin/base.html" %}
+
+{% block head_tail %}
+<style>
+/* ===== LOGIN PAGE — Pi Design System v2 ===== */
+body.pi-login-body {
+  background: #0B0D0F;
+  min-height: 100vh;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Animated background orbs */
+.pi-bg-orbs {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+}
+.pi-orb {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(80px);
+  opacity: 0.18;
+  animation: orbFloat 8s ease-in-out infinite;
+}
+.pi-orb-1 {
+  width: 520px; height: 520px;
+  background: radial-gradient(circle, #B8435D, transparent 70%);
+  top: -160px; right: -120px;
+  animation-delay: 0s;
+}
+.pi-orb-2 {
+  width: 380px; height: 380px;
+  background: radial-gradient(circle, #7c2d45, transparent 70%);
+  bottom: -100px; left: -80px;
+  animation-delay: -4s;
+}
+.pi-orb-3 {
+  width: 260px; height: 260px;
+  background: radial-gradient(circle, #D2798F, transparent 70%);
+  top: 45%; left: 55%;
+  animation-delay: -2s;
+  opacity: 0.1;
+}
+@keyframes orbFloat {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  33%       { transform: translate(20px, -20px) scale(1.04); }
+  66%       { transform: translate(-15px, 15px) scale(0.97); }
+}
+
+/* Grid pattern overlay */
+.pi-grid-overlay {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background-image:
+    linear-gradient(rgba(184,67,93,0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(184,67,93,0.04) 1px, transparent 1px);
+  background-size: 40px 40px;
+}
+
+/* Login wrapper */
+.pi-login-wrapper {
+  position: relative;
+  z-index: 10;
+  width: 100%;
+  max-width: 440px;
+  padding: 24px 16px;
+  animation: loginFadeIn 0.5s ease both;
+}
+@keyframes loginFadeIn {
+  from { opacity: 0; transform: translateY(24px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* Logo area */
+.pi-login-logo {
+  text-align: center;
+  margin-bottom: 32px;
+}
+.pi-logo-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+.pi-logo-icon {
+  width: 48px; height: 48px;
+  background: linear-gradient(135deg, #B8435D 0%, #7c2d45 100%);
+  border-radius: 14px;
+  display: flex; align-items: center; justify-content: center;
+  font-family: 'Lexend', sans-serif;
+  font-weight: 800;
+  font-size: 20px;
+  color: white;
+  box-shadow: 0 8px 24px rgba(184, 67, 93, 0.35);
+}
+.pi-login-title {
+  font-family: 'Lexend', sans-serif;
+  font-weight: 800;
+  font-size: 1.6rem;
+  color: #F4F6F7;
+  margin: 0 0 4px;
+  letter-spacing: -0.02em;
+}
+.pi-login-subtitle {
+  font-size: 0.875rem;
+  color: #8A9096;
+  margin: 0;
+}
+
+/* Glassmorphism card */
+.pi-login-card {
+  background: rgba(24, 27, 30, 0.85);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid rgba(184, 67, 93, 0.22);
+  border-radius: 20px;
+  padding: 36px 36px 32px;
+  box-shadow:
+    0 0 0 1px rgba(255,255,255,0.03),
+    0 24px 48px rgba(0,0,0,0.5),
+    inset 0 1px 0 rgba(255,255,255,0.06);
+  position: relative;
+  overflow: hidden;
+}
+/* Subtle top highlight */
+.pi-login-card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(184,67,93,0.5), transparent);
+}
+
+/* Form heading inside card */
+.pi-card-heading {
+  text-align: center;
+  margin-bottom: 28px;
+}
+.pi-card-heading h2 {
+  font-family: 'Lexend', sans-serif;
+  font-weight: 700;
+  font-size: 1.25rem;
+  color: #F4F6F7;
+  margin: 0 0 4px;
+}
+.pi-card-heading p {
+  font-size: 0.8rem;
+  color: #6C7379;
+  margin: 0;
+}
+
+/* Field groups */
+.pi-field {
+  margin-bottom: 20px;
+}
+.pi-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #B9BFC4;
+  margin-bottom: 8px;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+.pi-label svg { flex-shrink: 0; }
+
+.pi-input-wrap {
+  position: relative;
+}
+.pi-input {
+  width: 100%;
+  background: rgba(11, 13, 15, 0.8) !important;
+  border: 1px solid rgba(184, 67, 93, 0.2) !important;
+  border-radius: 10px !important;
+  color: #F4F6F7 !important;
+  padding: 12px 14px !important;
+  font-size: 0.9rem !important;
+  font-family: 'Be Vietnam Pro', sans-serif !important;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  box-sizing: border-box;
+}
+.pi-input:focus {
+  border-color: #B8435D !important;
+  box-shadow: 0 0 0 3px rgba(184, 67, 93, 0.18) !important;
+  outline: none;
+}
+.pi-input:read-only {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+.pi-input.is-invalid {
+  border-color: #F87171 !important;
+  box-shadow: 0 0 0 3px rgba(248, 113, 113, 0.15) !important;
+}
+
+/* Toggle password visibility */
+.pi-toggle-pw {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  padding: 4px;
+  cursor: pointer;
+  color: #6C7379;
+  transition: color 0.2s;
+  display: flex;
+  align-items: center;
+}
+.pi-toggle-pw:hover { color: #B9BFC4; }
+
+.pi-input-with-toggle { padding-right: 44px !important; }
+
+/* Error message */
+.pi-field-error {
+  margin-top: 6px;
+  font-size: 0.8rem;
+  color: #F87171;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* Hint text */
+.pi-hint {
+  margin-top: 6px;
+  font-size: 0.775rem;
+  color: #6C7379;
+}
+.pi-hint code {
+  background: rgba(184, 67, 93, 0.12);
+  color: #D2798F;
+  padding: 1px 5px;
+  border-radius: 4px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.75rem;
+}
+
+/* Divider */
+.pi-divider {
+  border: none;
+  border-top: 1px solid rgba(184, 67, 93, 0.12);
+  margin: 24px 0;
+}
+
+/* Submit button */
+.pi-btn-submit {
+  width: 100%;
+  background: linear-gradient(135deg, #B8435D 0%, #9c3550 100%) !important;
+  border: none !important;
+  border-radius: 10px !important;
+  color: white !important;
+  font-family: 'Lexend', sans-serif !important;
+  font-weight: 700 !important;
+  font-size: 0.95rem !important;
+  padding: 13px 24px !important;
+  cursor: pointer;
+  transition: all 0.25s;
+  box-shadow: 0 4px 14px rgba(184, 67, 93, 0.3);
+  position: relative;
+  overflow: hidden;
+}
+.pi-btn-submit::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(255,255,255,0.07) 0%, transparent 100%);
+}
+.pi-btn-submit:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(184, 67, 93, 0.4) !important;
+}
+.pi-btn-submit:active {
+  transform: translateY(0);
+}
+
+/* Footer */
+.pi-login-footer {
+  text-align: center;
+  margin-top: 28px;
+  font-size: 0.75rem;
+  color: #6C7379;
+}
+.pi-login-footer span {
+  color: #B8435D;
+  font-weight: 600;
+}
+</style>
+{% endblock %}
+
+{% block body %}
+<body class="pi-login-body">
+  <!-- Decorative orbs -->
+  <div class="pi-bg-orbs">
+    <div class="pi-orb pi-orb-1"></div>
+    <div class="pi-orb pi-orb-2"></div>
+    <div class="pi-orb pi-orb-3"></div>
+  </div>
+  <div class="pi-grid-overlay"></div>
+
+  <!-- Login panel -->
+  <div class="pi-login-wrapper">
+    <!-- Logo -->
+    <div class="pi-login-logo">
+      <div class="pi-logo-badge">
+        <div class="pi-logo-icon">π</div>
+      </div>
+      <p class="pi-login-title">Pi Backend Admin</p>
+      <p class="pi-login-subtitle">Secure database control panel · Internal use only</p>
+    </div>
+
+    <!-- Card -->
+    <div class="pi-login-card">
+      <div class="pi-card-heading">
+        <h2>Authenticate</h2>
+        <p>Paste your admin JWT to continue</p>
+      </div>
+
+      <form action="{{ url_for('admin:login') }}" method="POST" autocomplete="off">
+        <!-- Username field (fixed) -->
+        <div class="pi-field">
+          <label class="pi-label" for="pi-username">
+            <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
+            </svg>
+            Username
+          </label>
+          <input id="pi-username" name="username" type="text" class="pi-input form-control"
+                 value="admin" readonly autocomplete="off">
+          <p class="pi-hint">Fixed identifier — read only.</p>
+        </div>
+
+        <!-- JWT field -->
+        <div class="pi-field">
+          <label class="pi-label" for="pi-jwt">
+            <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+              <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+            </svg>
+            Admin JWT Token
+          </label>
+          <div class="pi-input-wrap">
+            <input id="pi-jwt" name="password" type="password"
+                   class="pi-input form-control pi-input-with-toggle {% if error %}is-invalid{% endif %}"
+                   placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." required autocomplete="off">
+            <button type="button" class="pi-toggle-pw" onclick="togglePw()" aria-label="Toggle visibility" id="pi-toggle-btn">
+              <svg id="pw-eye-icon" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>
+              </svg>
+            </button>
+          </div>
+          {% if error %}
+          <p class="pi-field-error">
+            <svg width="12" height="12" fill="currentColor" viewBox="0 0 20 20">
+              <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"/>
+            </svg>
+            {{ error }}
+          </p>
+          {% endif %}
+          <p class="pi-hint">
+            Obtain your token from <code>POST /v1/auth/login</code> with super-admin credentials.
+          </p>
+        </div>
+
+        <hr class="pi-divider">
+
+        <button type="submit" class="pi-btn-submit">
+          Authenticate &rarr;
+        </button>
+      </form>
+    </div>
+
+    <!-- Footer -->
+    <div class="pi-login-footer">
+      <span>Pi Ecosystem</span> &copy; 2026 · Unauthorized access is prohibited
+    </div>
+  </div>
+
+  <script>
+    function togglePw() {
+      const input = document.getElementById('pi-jwt');
+      const icon = document.getElementById('pw-eye-icon');
+      if (input.type === 'password') {
+        input.type = 'text';
+        icon.innerHTML = '<path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/>';
+      } else {
+        input.type = 'password';
+        icon.innerHTML = '<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>';
+      }
+    }
+  </script>
+</body>
+{% endblock %}

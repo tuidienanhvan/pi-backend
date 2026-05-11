@@ -17,8 +17,9 @@ class LicenseVerifyRequest(BaseModel):
 
 class LicenseVerifyResponse(BaseModel):
     success: bool
-    tier: Literal["free", "pro", "agency"]
+    tier: Literal["free", "pro", "max", "enterprise"]
     status: Literal["active", "expired", "revoked", "suspended"]
+    email: str | None = None
     expires_at: datetime | None = None
     features: list[str] = Field(default_factory=list)
     message: str = ""
@@ -36,6 +37,11 @@ class LicenseActivateResponse(BaseModel):
     site_id: int | None = None
     activated_sites: int
     max_sites: int
+    tier: str = "free"
+    email: str = ""
+    features: list[str] = Field(default_factory=list)
+    jwt: str = ""
+    expires_in: int = 0
     message: str = ""
 
 
@@ -51,9 +57,16 @@ class LicenseStatsResponse(BaseModel):
     expires_at: datetime | None = None
 
     # ── Pi AI Cloud package (monthly token subscription, independent of license tier) ──
-    package_slug: str | None = None   # 'starter' | 'pro' | 'agency' | None
+    package_slug: str | None = None   # 'starter' | 'pro' | 'max' | None
     package_tier: str | None = None   # same value as slug, convenience alias
     package_name: str | None = None   # display name
     package_status: str | None = None # 'active' | 'past_due' | 'cancelled'
     quota_limit: int = 0              # monthly token quota from package (0 = none/unlimited)
     quota_used: int = 0               # tokens used in current period
+
+
+class LicenseRegisterCredentialsRequest(BaseModel):
+    email: EmailStr
+    app_pass: str
+    site_url: str
+    domain: str

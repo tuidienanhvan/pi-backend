@@ -11,12 +11,13 @@ from typing import Any
 
 import bcrypt
 from jose import JWTError, jwt
-from sqlalchemy import select
+from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.core.exceptions import PiException
 from app.shared.auth.models import User
+from app.shared.license.models import License
 
 
 class AuthService:
@@ -40,15 +41,23 @@ class AuthService:
             return False
 
     # ─── JWT helpers ────────────────────────────────────
-    @staticmethod
-    def create_token(user: User) -> tuple[str, int]:
+    async def create_token(self, user: User) -> tuple[str, int]:
         """Return (jwt_string, expires_in_seconds)."""
         expires_in = settings.jwt_expire_minutes * 60
         now = datetime.now(timezone.utc)
+        
+        # Calculate highest tier
+        tier_q = select(License.tier).where(License.email == user.email)
+        tiers = (await self.db.execute(tier_q)).scalars().all()
+        highest_tier = "free"
+        if "max" in tiers: highest_tier = "max"
+        elif "pro" in tiers: highest_tier = "pro"
+
         payload: dict[str, Any] = {
             "sub": str(user.id),
             "email": user.email,
             "is_admin": user.is_admin,
+            "tier": highest_tier,
             "iat": int(now.timestamp()),
             "exp": int((now + timedelta(seconds=expires_in)).timestamp()),
             "type": "user",  # distinguishes from license Bearer
@@ -68,7 +77,9 @@ class AuthService:
         return await self.db.get(User, user_id)
 
     async def get_by_email(self, email: str) -> User | None:
-        q = select(User).where(User.email == email.lower().strip())
+        """Find user by exact email. Strict: no username/local-part matching."""
+        identifier = email.lower().strip()
+        q = select(User).where(User.email == identifier)
         return (await self.db.execute(q)).scalar_one_or_none()
 
     async def create_user(

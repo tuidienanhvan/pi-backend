@@ -28,24 +28,66 @@ class AdminService:
 
     # ─── Overview ─────────────────────────────────────────
     async def overview(self) -> AdminOverviewResponse:
-        since = datetime.now(timezone.utc) - timedelta(days=30)
+        now = datetime.now(timezone.utc)
+        since_30d = now - timedelta(days=30)
+        since_90d = now - timedelta(days=90)
+        since_ytd = now.replace(month=1, day=1, hour=0, minute=0, second=0, microsecond=0)
+        since_7d = now - timedelta(days=7)
 
-        tokens_q = select(func.coalesce(func.sum(AiUsage.pi_tokens_charged), 0)).where(
-            AiUsage.created_at >= since, AiUsage.status == "success"
-        )
-        tokens_spent = int((await self.db.execute(tokens_q)).scalar_one())
+        # Helper for revenue/cost aggregation
+        async def get_stats(since_date):
+            t_q = select(func.coalesce(func.sum(AiUsage.pi_tokens_charged), 0)).where(
+                AiUsage.created_at >= since_date, AiUsage.status == "success"
+            )
+            t_spent = int((await self.db.execute(t_q)).scalar_one())
 
-        cost_q = select(func.coalesce(func.sum(AiUsage.upstream_cost_cents), 0)).where(
-            AiUsage.created_at >= since, AiUsage.status == "success"
-        )
-        upstream_cost = int((await self.db.execute(cost_q)).scalar_one())
+            c_q = select(func.coalesce(func.sum(AiUsage.upstream_cost_cents), 0)).where(
+                AiUsage.created_at >= since_date, AiUsage.status == "success"
+            )
+            u_cost = int((await self.db.execute(c_q)).scalar_one())
 
-        # Revenue estimate — tokens × $9 per 100k
-        revenue_cents = int(tokens_spent * 9 / 100_000 * 100)
-        margin = 1 - (upstream_cost / revenue_cents) if revenue_cents > 0 else 0.0
+            # Revenue estimate — tokens × $9 per 100k
+            rev_cents = int(t_spent * 9 / 100_000 * 100)
+            return t_spent, rev_cents / 100.0, u_cost / 100.0
 
+        t_30d, rev_30d, cost_30d = await get_stats(since_30d)
+        _, rev_90d, _ = await get_stats(since_90d)
+        _, rev_ytd, _ = await get_stats(since_ytd)
+
+        margin = 1 - (cost_30d / rev_30d) if rev_30d > 0 else 0.0
+
+        # Licenses
         active_lic_q = select(func.count(License.id)).where(License.status == "active")
         active_licenses = int((await self.db.execute(active_lic_q)).scalar_one())
+
+        new_7d_q = select(func.count(License.id)).where(License.created_at >= since_7d)
+        new_7d = int((await self.db.execute(new_7d_q)).scalar_one())
+
+        # Expiring licenses (next 7 days)
+        expiring_q = (
+            select(License.id, License.email, License.tier, License.expires_at)
+            .where(
+                License.status == "active",
+                License.expires_at.between(now, now + timedelta(days=7))
+            )
+            .order_by(License.expires_at.asc())
+        )
+        expiring_rows = (await self.db.execute(expiring_q)).all()
+        expiring = []
+        for r in expiring_rows:
+            days_left = (r.expires_at - now).days
+            expiring.append({
+                "id": r.id,
+                "email": r.email,
+                "tier": r.tier,
+                "daysLeft": max(0, days_left)
+            })
+
+        # Token Projection (linear)
+        # If 10 days into month, projected = (current / 10) * 30
+        day_of_month = now.day
+        days_in_month = 30 # Approximation
+        projected = int((t_30d / 30) * days_in_month) if t_30d > 0 else 0
 
         # Provider health
         total_providers_q = select(func.count(AiProvider.id))
@@ -56,10 +98,20 @@ class AdminService:
         healthy = int((await self.db.execute(healthy_q)).scalar_one())
         down = int((await self.db.execute(down_q)).scalar_one())
 
+        # Key pool stats
+        from app.pi_ai_cloud.models import AiProviderKey
+        keys_total_q = select(func.count(AiProviderKey.id))
+        keys_available_q = select(func.count(AiProviderKey.id)).where(AiProviderKey.status == "available")
+        keys_allocated_q = select(func.count(AiProviderKey.id)).where(AiProviderKey.status == "allocated")
+
+        keys_total = int((await self.db.execute(keys_total_q)).scalar_one())
+        keys_available = int((await self.db.execute(keys_available_q)).scalar_one())
+        keys_allocated = int((await self.db.execute(keys_allocated_q)).scalar_one())
+
         # Top plugins
         top_q = (
             select(AiUsage.source_plugin, func.count(AiUsage.id).label("calls"))
-            .where(AiUsage.created_at >= since, AiUsage.source_plugin != "")
+            .where(AiUsage.created_at >= since_30d, AiUsage.source_plugin != "")
             .group_by(AiUsage.source_plugin)
             .order_by(desc("calls"))
             .limit(5)
@@ -67,15 +119,23 @@ class AdminService:
         top = [{"plugin": r[0], "calls": int(r[1])} for r in (await self.db.execute(top_q)).all()]
 
         return AdminOverviewResponse(
-            revenue_30d=revenue_cents / 100.0,
-            upstream_cost_30d=upstream_cost / 100.0,
+            revenue_30d=rev_30d,
+            revenue_90d=rev_90d,
+            revenue_ytd=rev_ytd,
+            upstream_cost_30d=cost_30d,
             margin_pct=round(margin, 3),
             active_licenses=active_licenses,
-            tokens_spent_30d=tokens_spent,
+            new_licenses_7d=new_7d,
+            tokens_spent_30d=t_30d,
+            projected_tokens_month_end=projected,
             total_providers=total_providers,
             healthy_providers=healthy,
             down_providers=down,
+            keys_total=keys_total,
+            keys_available=keys_available,
+            keys_allocated=keys_allocated,
             top_plugins=top,
+            expiring_licenses=expiring,
         )
 
     # ─── Licenses ─────────────────────────────────────────
@@ -292,38 +352,63 @@ class AdminService:
 
         items: list[AdminUserItem] = []
         for u in users:
-            lic_count_q = select(func.count(License.id)).where(License.email == u.email)
-            lic_count = int((await self.db.execute(lic_count_q)).scalar_one())
-
-            balance_q = (
-                select(func.coalesce(func.sum(TokenWallet.balance), 0))
-                .join(License, License.id == TokenWallet.license_id)
-                .where(License.email == u.email)
-            )
-            balance = int((await self.db.execute(balance_q)).scalar_one())
-
-            spent_q = (
-                select(func.coalesce(func.sum(TokenWallet.lifetime_topup), 0))
-                .join(License, License.id == TokenWallet.license_id)
-                .where(License.email == u.email)
-            )
-            # 9 cents per 100 tokens (approximately, depending on pack)
-            lifetime_topup = int((await self.db.execute(spent_q)).scalar_one())
-            spent_cents = int(lifetime_topup * 9 / 100_000 * 100)
-
-            items.append(AdminUserItem(
-                id=u.id,
-                email=u.email,
-                name=u.name,
-                is_admin=u.is_admin,
-                is_verified=u.is_verified,
-                license_count=lic_count,
-                token_balance=balance,
-                total_spent_cents=spent_cents,
-                created_at=u.created_at,
-                last_login_at=u.last_login_at,
-            ))
+            items.append(await self._user_to_item(u))
         return items, total
+
+    async def get_user(self, user_id: int) -> User | None:
+        return await self.db.get(User, user_id)
+
+    async def get_user_detail(self, user_id: int) -> AdminUserItem | None:
+        user = await self.db.get(User, user_id)
+        if not user:
+            return None
+        return await self._user_to_item(user)
+
+    async def patch_user_profile(self, user_id: int, payload) -> AdminUserItem | None:
+        user = await self.db.get(User, user_id)
+        if user is None:
+            return None
+        if payload.application_password is not None:
+            user.application_password = payload.application_password
+        if payload.site_url is not None:
+            user.site_url = payload.site_url
+        await self.db.flush()
+        return await self._user_to_item(user)
+
+    async def _user_to_item(self, u: User) -> AdminUserItem:
+        lic_count_q = select(func.count(License.id)).where(License.email == u.email)
+        lic_count = int((await self.db.execute(lic_count_q)).scalar_one())
+
+        balance_q = (
+            select(func.coalesce(func.sum(TokenWallet.balance), 0))
+            .join(License, License.id == TokenWallet.license_id)
+            .where(License.email == u.email)
+        )
+        balance = int((await self.db.execute(balance_q)).scalar_one())
+
+        spent_q = (
+            select(func.coalesce(func.sum(TokenWallet.lifetime_topup), 0))
+            .join(License, License.id == TokenWallet.license_id)
+            .where(License.email == u.email)
+        )
+        # 9 cents per 100 tokens (approximately, depending on pack)
+        lifetime_topup = int((await self.db.execute(spent_q)).scalar_one())
+        spent_cents = int(lifetime_topup * 9 / 100_000 * 100)
+
+        return AdminUserItem(
+            id=u.id,
+            email=u.email,
+            name=u.name,
+            is_admin=u.is_admin,
+            is_verified=u.is_verified,
+            license_count=lic_count,
+            token_balance=balance,
+            total_spent_cents=spent_cents,
+            created_at=u.created_at,
+            last_login_at=u.last_login_at,
+            application_password=u.application_password,
+            site_url=u.site_url,
+        )
 
     # ─── Providers ────────────────────────────────────────
     async def _provider_to_item(self, p: AiProvider) -> AdminProviderItem:
@@ -424,7 +509,7 @@ class AdminService:
         TokenPack(slug="starter", tokens=10_000, price_cents=100, discount_pct=0, label="Starter").model_dump(),
         TokenPack(slug="standard", tokens=100_000, price_cents=900, discount_pct=10, label="Standard").model_dump(),
         TokenPack(slug="pro", tokens=500_000, price_cents=3500, discount_pct=30, label="Pro").model_dump(),
-        TokenPack(slug="agency", tokens=1_000_000, price_cents=5900, discount_pct=41, label="Agency").model_dump(),
+        TokenPack(slug="max", tokens=1_000_000, price_cents=5900, discount_pct=41, label="Max").model_dump(),
         TokenPack(slug="enterprise", tokens=5_000_000, price_cents=24900, discount_pct=50, label="Enterprise").model_dump(),
     ]
     DEFAULT_FLAGS = FeatureFlags().model_dump()

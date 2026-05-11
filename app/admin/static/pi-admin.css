@@ -1,0 +1,243 @@
+:root {
+  /* Pi design tokens (match dashboard webapp) */
+  --pi-bg:          #0B0D0F;
+  --pi-bg-alt:      #121418;
+  --pi-bg-card:     #181B1E;
+  --pi-bg-elevated: #22262A;
+  --pi-bg-input:    #0B0D0F;
+
+  --pi-text:       #F4F6F7;
+  --pi-text-2:     #B9BFC4;
+  --pi-text-3:     #8A9096;
+  --pi-text-muted: #6C7379;
+
+  --pi-primary:       #B8435D; /* Maroon */
+  --pi-primary-hover: #D2798F;
+  --pi-success:       #34D399;
+  --pi-warning:       #FBBF24;
+  --pi-danger:        #F87171;
+  --pi-info:          #38BDF8;
+
+  --pi-border:        rgba(184, 67, 93, 0.14);
+  --pi-border-strong: rgba(184, 67, 93, 0.32);
+  --pi-radius:        0.75rem;
+
+  --pi-font-body:    'Be Vietnam Pro', 'Inter', sans-serif;
+  --pi-font-display: 'Lexend', 'Inter', sans-serif;
+}
+
+/* Force dark scheme everywhere */
+body, .navbar, .sidebar, .card, .modal-content, .page {
+  background-color: var(--pi-bg) !important;
+  color: var(--pi-text) !important;
+  font-family: var(--pi-font-body) !important;
+}
+
+.page-wrapper {
+  background-color: var(--pi-bg) !important;
+}
+
+.card {
+  background-color: var(--pi-bg-card) !important;
+  border: 1px solid var(--pi-border) !important;
+  border-radius: var(--pi-radius) !important;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3) !important;
+}
+
+.card-header {
+  border-bottom: 1px solid var(--pi-border) !important;
+  background-color: transparent !important;
+}
+
+.card-title {
+  color: var(--pi-text) !important;
+  font-family: var(--pi-font-display) !important;
+  font-weight: 700 !important;
+}
+
+/* Sidebar */
+.navbar-vertical {
+  background-color: var(--pi-bg-card) !important;
+  border-right: 1px solid var(--pi-border) !important;
+  box-shadow: 4px 0 20px rgba(0, 0, 0, 0.2) !important;
+}
+
+.navbar-vertical .nav-link {
+  color: var(--pi-text-2) !important;
+  border-radius: 8px !important;
+  margin: 4px 12px !important;
+  padding: 8px 12px !important;
+  transition: all 0.2s ease;
+  font-weight: 500 !important;
+}
+
+.navbar-vertical .nav-link:hover {
+  background-color: var(--pi-bg-elevated) !important;
+  color: var(--pi-text) !important;
+  transform: translateX(2px);
+}
+
+.navbar-vertical .nav-link.active {
+  background-color: var(--pi-primary) !important;
+  color: #FFFFFF !important;
+  box-shadow: 0 4px 12px rgba(184, 67, 93, 0.3) !important;
+}
+
+/* Header */
+.navbar-brand {
+  font-family: var(--pi-font-display) !important;
+  font-weight: 800 !important;
+  color: var(--pi-text) !important;
+}
+
+.navbar-brand::before {
+  content: "Pi";
+  display: inline-block;
+  background: var(--pi-primary);
+  color: white;
+  padding: 2px 8px;
+  border-radius: 6px;
+  margin-right: 10px;
+  font-size: 0.8rem;
+  vertical-align: middle;
+}
+
+/* Buttons */
+.btn {
+  border-radius: 8px !important;
+  font-weight: 600 !important;
+  transition: all 0.2s !important;
+}
+
+.btn-primary {
+  background-color: var(--pi-primary) !important;
+  border-color: var(--pi-primary) !important;
+  color: #FFFFFF !important;
+}
+
+.btn-primary:hover {
+  background-color: var(--pi-primary-hover) !important;
+  border-color: var(--pi-primary-hover) !important;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(184, 67, 93, 0.2) !important;
+}
+
+.btn-secondary, .btn-light {
+  background-color: var(--pi-bg-elevated) !important;
+  border-color: var(--pi-border) !important;
+  color: var(--pi-text) !important;
+}
+
+.btn-secondary:hover, .btn-light:hover {
+  background-color: var(--pi-bg-card) !important;
+  border-color: var(--pi-border-strong) !important;
+}
+
+/* Tables */
+.table {
+  color: var(--pi-text) !important;
+  background-color: transparent !important;
+}
+
+.table thead th {
+  background-color: var(--pi-bg-alt) !important;
+  color: var(--pi-text-muted) !important;
+  font-family: var(--pi-font-display) !important;
+  text-transform: uppercase !important;
+  font-size: 0.7rem !important;
+  letter-spacing: 0.05em !important;
+  border-bottom: 1px solid var(--pi-border) !important;
+  padding: 12px 16px !important;
+}
+
+.table tbody td {
+  border-bottom: 1px solid var(--pi-border-light) !important;
+  padding: 12px 16px !important;
+  font-size: 0.85rem !important;
+}
+
+.table tbody tr:hover {
+  background-color: rgba(184, 67, 93, 0.04) !important;
+}
+
+/* Form inputs */
+.form-control, .form-select, .form-check-input {
+  background-color: var(--pi-bg-input) !important;
+  border: 1px solid var(--pi-border) !important;
+  color: var(--pi-text) !important;
+  border-radius: 8px !important;
+  padding: 10px 14px !important;
+}
+
+.form-control:focus, .form-select:focus {
+  border-color: var(--pi-primary) !important;
+  box-shadow: 0 0 0 3px rgba(184, 67, 93, 0.15) !important;
+  outline: none !important;
+}
+
+.form-label {
+  color: var(--pi-text-2) !important;
+  font-weight: 500 !important;
+  margin-bottom: 6px !important;
+}
+
+/* Pagination */
+.pagination .page-link {
+  background-color: var(--pi-bg-card) !important;
+  border-color: var(--pi-border) !important;
+  color: var(--pi-text-2) !important;
+  margin: 0 2px !important;
+  border-radius: 6px !important;
+}
+
+.pagination .page-item.active .page-link {
+  background-color: var(--pi-primary) !important;
+  border-color: var(--pi-primary) !important;
+  color: #FFFFFF !important;
+}
+
+.pagination .page-item.disabled .page-link {
+  background-color: var(--pi-bg) !important;
+  color: var(--pi-text-muted) !important;
+}
+
+/* Login Page specific */
+.login-page-custom {
+  background: radial-gradient(circle at top right, #1a1012, var(--pi-bg)) !important;
+}
+
+.login-card-custom {
+  max-width: 400px;
+  width: 100%;
+  margin: 0 auto;
+}
+
+/* Badges */
+.badge {
+  font-weight: 600 !important;
+  border-radius: 4px !important;
+  padding: 4px 8px !important;
+}
+
+.bg-success { background-color: var(--pi-success) !important; color: #000 !important; }
+.bg-warning { background-color: var(--pi-warning) !important; color: #000 !important; }
+.bg-danger { background-color: var(--pi-danger) !important; color: #FFF !important; }
+
+/* Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--pi-bg);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--pi-bg-elevated);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--pi-text-muted);
+}

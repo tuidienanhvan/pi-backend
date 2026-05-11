@@ -20,13 +20,11 @@ from sqlalchemy import select
 from app.admin.schemas import AdminLicenseCreate
 from app.admin.schemas_cloud import AdminAssignPackage
 from app.core.db import AsyncSessionLocal
-from app.pi_ai_cloud.models import AiPackage, AiProvider, AiProviderKey, LicensePackage
+from app.models import AiPackage, AiProvider, AiProviderKey, LicensePackage, License
 from app.pi_ai_cloud.services.key_allocator import KeyAllocator
-from app.shared.license.models import License
 
 PLUGINS = [
-    "pi-ai-cloud", "pi-seo", "pi-chatbot", "pi-leads",
-    "pi-analytics", "pi-performance", "pi-dashboard",
+    "pi-api",
 ]
 
 # Auto-allocation: try providers in order, grab whatever's available.
@@ -127,14 +125,14 @@ async def main(email: str, name: str) -> None:
         await db.commit()
 
         # Summary
-        total_licenses = int((await db.execute(
+        total_licenses = (await db.execute(
             select(License).where(License.email == email)
-        )).all().__len__())
+        )).all().__len__()
         print(f"\n✓ Done. {email} now owns {total_licenses} Pro licenses.")
 
-        total_keys_alloc = int((await db.execute(
+        total_keys_alloc = (await db.execute(
             select(AiProviderKey).where(AiProviderKey.status == "allocated")
-        )).all().__len__())
+        )).all().__len__()
         print(f"  Total allocated keys in pool: {total_keys_alloc}")
 
 

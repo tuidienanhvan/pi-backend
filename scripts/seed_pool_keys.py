@@ -14,7 +14,7 @@ import asyncio
 from sqlalchemy import select
 
 from app.core.db import AsyncSessionLocal
-from app.pi_ai_cloud.models import AiProvider, AiProviderKey
+from app.models import AiProvider, AiProviderKey
 
 # Provider slug -> (count, dummy-prefix)
 POOL_SEED = [

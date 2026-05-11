@@ -10,7 +10,7 @@ import asyncio
 from sqlalchemy import select
 
 from app.core.db import AsyncSessionLocal
-from app.pi_ai_cloud.models import AiPackage, AiProvider
+from app.models import AiPackage, AiProvider
 
 # ─── 25 Providers — metadata only. API keys live in ai_provider_keys pool. ────
 # Ordered by priority (lower = preferred). Free tier first, paid fallback last.
@@ -97,14 +97,14 @@ PROVIDERS = [
         "pi_tokens_per_input": 1.0, "pi_tokens_per_output": 1.5,
         "max_rpm": 15,
     },
-    {
-        "slug": "cloudflare-llama-free",
-        "display_name": "Cloudflare Workers AI (Free)",
-        "base_url": "https://api.cloudflare.com/client/v4/accounts/REPLACE_ACCOUNT_ID/ai/v1",
-        "model_id": "@cf/meta/llama-3.1-8b-instruct",
-        "tier": "free", "priority": 55,
-        "pi_tokens_per_input": 1.0, "pi_tokens_per_output": 1.2,
-    },
+    # {
+    #     "slug": "cloudflare-llama-free",
+    #     "display_name": "Cloudflare Workers AI (Free)",
+    #     "base_url": "https://api.cloudflare.com/client/v4/accounts/REPLACE_ACCOUNT_ID/ai/v1",
+    #     "model_id": "@cf/meta/llama-3.1-8b-instruct",
+    #     "tier": "free", "priority": 55,
+    #     "pi_tokens_per_input": 1.0, "pi_tokens_per_output": 1.2,
+    # },
     {
         "slug": "nvidia-nim-free",
         "display_name": "NVIDIA NIM — Llama 3.1 (Free)",
@@ -266,25 +266,9 @@ PACKAGES = [
         "sort_order": 10,
     },
     {
-        "slug": "starter",
-        "display_name": "Starter",
-        "description": "Website cá nhân hoặc blog 1 site.",
-        "price_cents_monthly": 900,    # $9/mo
-        "price_cents_yearly": 9000,    # $90/yr = 2 months free
-        "token_quota_monthly": 200_000,
-        "allowed_qualities": ["fast", "balanced"],
-        "features": [
-            "200K Pi tokens/tháng",
-            "Mix free + balanced models",
-            "Email support (24h)",
-            "pi-seo + pi-chatbot",
-        ],
-        "sort_order": 20,
-    },
-    {
         "slug": "pro",
         "display_name": "Pro",
-        "description": "Agency nhỏ, 3-5 websites.",
+        "description": "Max nhỏ, 3-5 websites.",
         "price_cents_monthly": 2900,   # $29/mo
         "price_cents_yearly": 29000,
         "token_quota_monthly": 2_000_000,
@@ -293,15 +277,15 @@ PACKAGES = [
             "2M Pi tokens/tháng",
             "Quality balanced (mix providers)",
             "Priority support (8h)",
-            "Tất cả 7 plugin Pro",
+            "Full access Pi API Pro",
             "API keys cấp riêng theo license",
         ],
         "sort_order": 30,
     },
     {
-        "slug": "agency",
-        "display_name": "Agency",
-        "description": "Agency lớn, 20+ websites.",
+        "slug": "max",
+        "display_name": "Max",
+        "description": "Max lớn, 20+ websites.",
         "price_cents_monthly": 9900,   # $99/mo
         "price_cents_yearly": 99000,
         "token_quota_monthly": 10_000_000,
@@ -315,23 +299,6 @@ PACKAGES = [
         ],
         "sort_order": 40,
     },
-    {
-        "slug": "enterprise",
-        "display_name": "Enterprise",
-        "description": "SaaS doanh nghiệp, SLA, volume custom.",
-        "price_cents_monthly": 0,  # contact sales
-        "price_cents_yearly": 0,
-        "token_quota_monthly": 100_000_000,
-        "allowed_qualities": ["fast", "balanced", "best"],
-        "features": [
-            "100M+ Pi tokens/tháng",
-            "SLA 99.9% + dedicated infra",
-            "On-premise deployment option",
-            "Custom AI provider integrations",
-            "Kỹ sư Pi support riêng",
-        ],
-        "sort_order": 50,
-    },
 ]
 
 
@@ -343,12 +310,12 @@ async def seed_providers(db) -> tuple[int, int]:
         if existing is None:
             db.add(AiProvider(**cfg))
             added += 1
-            print(f"  + {slug}")
+            print(f"  [+] {slug}")
         else:
             for k, v in cfg.items():
                 setattr(existing, k, v)
             updated += 1
-            print(f"  ↻ {slug}")
+            print(f"  [*] {slug}")
     return added, updated
 
 
@@ -360,20 +327,20 @@ async def seed_packages(db) -> tuple[int, int]:
         if existing is None:
             db.add(AiPackage(**cfg))
             added += 1
-            print(f"  + package/{slug}")
+            print(f"  [+] package/{slug}")
         else:
             for k, v in cfg.items():
                 setattr(existing, k, v)
             updated += 1
-            print(f"  ↻ package/{slug}")
+            print(f"  [*] package/{slug}")
     return added, updated
 
 
 async def main() -> None:
     async with AsyncSessionLocal() as db:
-        print("── Providers ──")
+        print("=== Providers ===")
         pa, pu = await seed_providers(db)
-        print("── Packages ──")
+        print("=== Packages ===")
         ka, ku = await seed_packages(db)
         await db.commit()
         print(f"\nDone. Providers: {pa} added, {pu} updated. Packages: {ka} added, {ku} updated.")
