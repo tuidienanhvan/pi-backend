@@ -43,6 +43,10 @@ logs/
 *.sqlite3
 *.db
 
+# Database dumps — never commit (may contain real customer data)
+backup-*.sql
+*.dump
+
 # Secrets
 *.pem
 *.key
