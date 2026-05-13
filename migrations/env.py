@@ -11,14 +11,16 @@ from alembic import context
 
 # Import app settings + models so Alembic can autogenerate
 from app.core.config import settings
+from app.core.db import _build_engine_args  # SSL-aware URL splitter
 from app.models import Base  # noqa: F401  — imports register all models
 
 config = context.config
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-# Override URL from env
-config.set_main_option("sqlalchemy.url", settings.database_url)
+# Override URL from env — strip libpq SSL flags, asyncpg gets them via connect_args
+_clean_url, _connect_args = _build_engine_args(settings.database_url)
+config.set_main_option("sqlalchemy.url", _clean_url)
 
 target_metadata = Base.metadata
 
@@ -46,6 +48,7 @@ async def run_async_migrations() -> None:
         config.get_section(config.config_ini_section, {}),
         prefix="sqlalchemy.",
         poolclass=pool.NullPool,
+        connect_args=_connect_args,  # pass SSL through to asyncpg
     )
     async with connectable.connect() as conn:
         await conn.run_sync(do_run_migrations)
