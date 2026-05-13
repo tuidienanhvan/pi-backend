@@ -7,12 +7,16 @@ dockerfilePath = "Dockerfile"
 
 [deploy]
 healthcheckPath = "/health"
-healthcheckTimeout = 10
+# Cold start budget: alembic upgrade (~10-20s on first deploy with 12
+# migrations) + uvicorn boot (~5s) + safety buffer. Railway kills the
+# container if /health never returns 200 within this window.
+healthcheckTimeout = 300
 restartPolicyType = "ON_FAILURE"
 restartPolicyMaxRetries = 3
-startCommand = "alembic upgrade head && gunicorn app.main:app --worker-class=uvicorn.workers.UvicornWorker --bind=0.0.0.0:$PORT --workers=$WEB_CONCURRENCY --timeout=60"
+# ${WEB_CONCURRENCY:-2} provides a default of 2 workers when the env var
+# is unset, so gunicorn never sees an empty --workers argument.
+startCommand = "alembic upgrade head && gunicorn app.main:app --worker-class=uvicorn.workers.UvicornWorker --bind=0.0.0.0:$PORT --workers=${WEB_CONCURRENCY:-2} --timeout=60"
 
-# Env vars managed via Railway dashboard:
-#   APP_SECRET_KEY, JWT_SECRET, DATABASE_URL, REDIS_URL,
-#   ANTHROPIC_API_KEY, OPENAI_API_KEY, APP_BASE_URL,
-#   APP_CORS_ORIGINS, SENTRY_DSN
+# Env vars managed via Railway dashboard — see /core/config.py for full list.
+# Bare minimum: DATABASE_URL, REDIS_URL, JWT_SECRET, APP_SECRET_KEY, CRON_SECRET,
+# APP_CORS_ORIGINS, PI_AI_NEW_ROUTING_ENABLED.
