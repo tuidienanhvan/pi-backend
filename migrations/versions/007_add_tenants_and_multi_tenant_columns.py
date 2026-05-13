@@ -8,7 +8,7 @@ path referenced by older notes.
 
 from typing import Sequence, Union
 
-revision: str = "007_add_tenants_and_multi_tenant_columns"
+revision: str = "007b_tenants_multi"
 down_revision: Union[str, None] = "007_add_saas_tenants"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
