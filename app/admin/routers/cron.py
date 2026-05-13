@@ -9,10 +9,12 @@ Each job's last_run / next_run / status lives in app_settings as JSON
 under key "cron_status". Updated by the job itself when it runs.
 """
 
+import os
+import secrets
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Header, HTTPException
 from pydantic import BaseModel
 
 from app.admin.audit import AuditLogger
@@ -22,6 +24,11 @@ from app.pi_ai_cloud.services.key_allocator import KeyAllocator
 from app.shared.auth.deps import CurrentAdmin
 
 router = APIRouter()
+
+# Static secret used by GitHub Actions / external schedulers to trigger crons
+# without needing a rotating admin JWT. Set CRON_SECRET in env.
+# Empty/unset = header auth disabled (only admin JWT path allowed).
+CRON_SECRET = os.getenv("CRON_SECRET", "")
 
 CRON_JOBS = [
     {
@@ -118,9 +125,40 @@ async def list_cron(admin: CurrentAdmin, db: DbSession) -> CronStatusResponse:  
     return CronStatusResponse(jobs=jobs)
 
 
+@router.post("/cron/{slug}/run-public")
+async def run_cron_public(
+    slug: str,
+    db: DbSession,
+    x_cron_secret: Optional[str] = Header(None, alias="X-Cron-Secret"),
+) -> dict:
+    """External trigger (GitHub Actions, Vercel Cron, etc.) — uses static secret.
+
+    Requires CRON_SECRET env var to be set. Compares with constant-time check.
+    Does NOT write to audit_log (no admin actor) but updates cron_status.
+    """
+    if not CRON_SECRET:
+        raise HTTPException(503, "External cron trigger disabled (CRON_SECRET not set)")
+    if not x_cron_secret or not secrets.compare_digest(x_cron_secret, CRON_SECRET):
+        raise HTTPException(401, "Invalid X-Cron-Secret")
+    return await _execute_cron(slug, db, actor_label="external-cron")
+
+
 @router.post("/cron/{slug}/run")
-async def run_cron(slug: str, admin: CurrentAdmin, db: DbSession) -> dict:  # noqa: ARG001
-    """Manually trigger a cron job."""
+async def run_cron(slug: str, admin: CurrentAdmin, db: DbSession) -> dict:
+    """Admin manual trigger (UI). Writes audit log."""
+    result = await _execute_cron(slug, db, actor_label=f"admin:{admin.email}")
+    await AuditLogger.log(
+        db, actor_id=admin.id, actor_email=admin.email,
+        action="update", resource_type="cron", resource_id=slug,
+        resource_label=slug, after={"status": result["status"], "duration_ms": result["duration_ms"]},
+        message=f"Manually ran cron '{slug}' — {result['status']} in {result['duration_ms']}ms",
+        severity="warning" if result["status"] == "failed" else "info",
+    )
+    return result
+
+
+async def _execute_cron(slug: str, db, *, actor_label: str) -> dict:
+    """Shared cron executor — used by both /run (admin) and /run-public (external)."""
     if slug not in {j["slug"] for j in CRON_JOBS}:
         raise HTTPException(404, f"Unknown job '{slug}'")
 
@@ -152,16 +190,9 @@ async def run_cron(slug: str, admin: CurrentAdmin, db: DbSession) -> dict:  # no
         "last_status": status,
         "last_error": error,
         "last_duration_ms": duration_ms,
+        "last_actor": actor_label,
     }
     await _save_status(db, raw)
-
-    await AuditLogger.log(
-        db, actor_id=admin.id, actor_email=admin.email,
-        action="update", resource_type="cron", resource_id=slug,
-        resource_label=slug, after={"status": status, "duration_ms": duration_ms, "result": result},
-        message=f"Manually ran cron '{slug}' — {status} in {duration_ms}ms",
-        severity="warning" if status == "failed" else "info",
-    )
 
     return {
         "slug": slug, "status": status, "duration_ms": duration_ms,

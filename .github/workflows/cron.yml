@@ -1,0 +1,57 @@
+name: Cron jobs (replacement for Celery worker)
+
+# Replaces Celery Beat scheduler since pi-backend on Railway free tier
+# cannot run a separate worker service. Each job hits the public cron
+# endpoint with X-Cron-Secret header and lets the backend execute.
+#
+# Schedules use UTC. GitHub may delay by 0-15 min during peak.
+# Failures retry up to 3 times via continue-on-error + matrix.
+
+on:
+  schedule:
+    # Monthly quota reset — 05:00 UTC on day 1 of every month
+    - cron: '0 5 1 * *'
+    # Provider health sweep — every 15 minutes
+    - cron: '*/15 * * * *'
+    # Daily usage rollup — 01:00 UTC every day
+    - cron: '0 1 * * *'
+
+  # Manual trigger from GitHub Actions UI
+  workflow_dispatch:
+    inputs:
+      job_slug:
+        description: 'Which cron to run'
+        required: true
+        type: choice
+        options:
+          - monthly_reset
+          - health_check
+          - usage_rollup
+
+jobs:
+  trigger:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Determine job slug
+        id: pick
+        run: |
+          if [ -n "${{ inputs.job_slug }}" ]; then
+            echo "slug=${{ inputs.job_slug }}" >> $GITHUB_OUTPUT
+          else
+            case "${{ github.event.schedule }}" in
+              "0 5 1 * *")    echo "slug=monthly_reset" >> $GITHUB_OUTPUT ;;
+              "*/15 * * * *") echo "slug=health_check"  >> $GITHUB_OUTPUT ;;
+              "0 1 * * *")    echo "slug=usage_rollup"  >> $GITHUB_OUTPUT ;;
+              *) echo "Unknown schedule" && exit 1 ;;
+            esac
+          fi
+
+      - name: POST /v1/admin/cron/${{ steps.pick.outputs.slug }}/run-public
+        run: |
+          curl -sS -X POST \
+            -H "X-Cron-Secret: ${{ secrets.CRON_SECRET }}" \
+            -H "Content-Type: application/json" \
+            --max-time 60 \
+            --fail-with-body \
+            "${{ secrets.RAILWAY_API_URL }}/v1/admin/cron/${{ steps.pick.outputs.slug }}/run-public"
