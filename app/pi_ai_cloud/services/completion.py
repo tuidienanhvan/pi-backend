@@ -17,12 +17,21 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.exceptions import AIProviderError, PiException
 from app.core.logging_conf import get_logger
+from app.core.source_plugin import validate_source_plugin
 from app.pi_ai_cloud.models import AiProvider, AiProviderKey, AiUsage
 from app.pi_ai_cloud.providers.base import CompletionResult
 from app.pi_ai_cloud.providers.openai_compat import OpenAICompatAdapter
 from app.pi_ai_cloud.services.key_allocator import KeyAllocator
 from app.pi_ai_cloud.services.quota import QuotaExceeded, QuotaService
+from app.pi_ai_cloud.services.wallet import WalletService
 from app.shared.license.models import License
+
+# Feature flag: package-driven routing with shared-pool fallback (T-20260513-001).
+# false (default) → legacy behavior (keys_for_license only).
+# true            → new routing: respect routing_mode, allowed_tiers, shared pool.
+NEW_ROUTING_ENABLED = os.getenv("PI_AI_NEW_ROUTING_ENABLED", "false").lower() in {
+    "1", "true", "yes", "on",
+}
 
 logger = get_logger(__name__)
 
@@ -67,14 +76,49 @@ class CompletionService:
         source_plugin: str = "",
         source_endpoint: str = "",
     ) -> Completion:
-        # 1. Quota check (raises 402 if exceeded)
+        # 0. Validate source_plugin (T-20260513-001 — raises 400 if unknown)
+        source_plugin = validate_source_plugin(source_plugin)
+
+        # 1. Quota check (raises 402 if exceeded, 403 if quality not allowed)
         estimated = _estimate_tokens(messages) + max_tokens
         qcheck = await self.quota.check(lic.id, estimated_tokens=estimated, quality=quality)
+        wallet = await WalletService(self.db).get_or_create(lic)
 
-        # 2. Pick keys belonging to THIS license
-        keys = await self.allocator.keys_for_license(lic.id)
-        if not keys:
-            raise NoKeysAvailable()
+        # 2. Pick candidate keys per package routing policy (T-20260513-001)
+        keys: list[AiProviderKey] = []
+
+        if NEW_ROUTING_ENABLED:
+            # Load package routing config (already validated by quota.check above)
+            pkg_pair = await self.quota.get_package(lic.id)
+            package = pkg_pair[1] if pkg_pair else None
+            routing_mode = getattr(package, "routing_mode", "shared") if package else "shared"
+            allowed_tiers = list(getattr(package, "allowed_tiers", None) or ["free"])
+            priority_boost = int(getattr(package, "priority_boost", 0) or 0)
+
+            if routing_mode in {"dedicated", "hybrid"}:
+                keys = await self.allocator.keys_for_license(lic.id)
+
+            if not keys and routing_mode in {"shared", "hybrid"}:
+                keys = await self.allocator.keys_from_shared_pool(
+                    allowed_tiers=allowed_tiers,
+                    priority_boost=priority_boost,
+                )
+
+            if not keys:
+                logger.warning(
+                    "completion_no_keys",
+                    extra={
+                        "license_id": lic.id,
+                        "routing_mode": routing_mode,
+                        "allowed_tiers": allowed_tiers,
+                    },
+                )
+                raise NoKeysAvailable()
+        else:
+            # Legacy path: license must have allocated keys
+            keys = await self.allocator.keys_for_license(lic.id)
+            if not keys:
+                raise NoKeysAvailable()
 
         # Filter by quality — map allowed_qualities to provider tiers
         keys = await self._filter_by_quality(keys, quality)
@@ -117,7 +161,7 @@ class CompletionService:
                 # 5. Log usage
                 self.db.add(AiUsage(
                     license_id=lic.id,
-                    wallet_id=0,  # legacy; wallet system being phased out
+                    wallet_id=wallet.id,
                     provider_id=provider.id,
                     provider_key_id=key.id,
                     source_plugin=source_plugin,
@@ -143,7 +187,20 @@ class CompletionService:
 
             except Exception as exc:  # noqa: BLE001
                 last_error = exc
+                latency = int((time.perf_counter() - started) * 1000)
                 await self.allocator.mark_health(key.id, success=False, error=str(exc))
+                self.db.add(AiUsage(
+                    license_id=lic.id,
+                    wallet_id=wallet.id,
+                    provider_id=provider.id,
+                    provider_key_id=key.id,
+                    source_plugin=source_plugin,
+                    source_endpoint=source_endpoint,
+                    latency_ms=latency,
+                    status="error",
+                    error_code=exc.__class__.__name__,
+                ))
+                await self.db.flush()
                 logger.warning(
                     "provider_key_failed_trying_next",
                     extra={"key_id": key.id, "slug": provider.slug, "error": str(exc)[:200]},

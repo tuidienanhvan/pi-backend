@@ -198,6 +198,90 @@ class KeyAllocator:
         await self.db.flush()
         return res.rowcount or 0
 
+    # ─── Auto-allocation (T-20260513-001) ──────────────────
+    async def auto_allocate_to_license(
+        self,
+        *,
+        license_id: int,
+        count: int,
+        allowed_tiers: list[str] | None = None,
+    ) -> list[AiProviderKey]:
+        """Pick N healthy available keys across allowed tiers and assign to license.
+
+        Strategy: prefer free-tier providers first (cheaper per call),
+        balance across providers to avoid quota concentration.
+        Used on package assignment when routing_mode in {"dedicated","hybrid"}.
+        """
+        from app.pi_ai_cloud.models import AiProvider  # local import (cycle guard)
+
+        if count <= 0:
+            return []
+        tiers = list(allowed_tiers or ["free"])
+
+        q = (
+            select(AiProviderKey)
+            .join(AiProvider, AiProvider.id == AiProviderKey.provider_id)
+            .where(
+                AiProviderKey.status == "available",
+                AiProviderKey.allocated_to_license_id.is_(None),
+                AiProviderKey.health_status != "down",
+                AiProvider.is_enabled.is_(True),
+                AiProvider.tier.in_(tiers),
+            )
+            # free tier first, lower monthly use first
+            .order_by(
+                AiProvider.tier.asc(),  # "free" < "paid" alphabetically
+                AiProviderKey.monthly_used_tokens.asc(),
+                AiProviderKey.id.asc(),
+            )
+            .limit(count)
+        )
+        picks = list((await self.db.execute(q)).scalars().all())
+        now = datetime.now(timezone.utc)
+        for k in picks:
+            k.status = "allocated"
+            k.allocated_to_license_id = license_id
+            k.allocated_at = now
+        await self.db.flush()
+        return picks
+
+    # ─── Shared pool router (T-20260513-001) ───────────────
+    async def keys_from_shared_pool(
+        self,
+        *,
+        allowed_tiers: list[str] | None = None,
+        priority_boost: int = 0,  # noqa: ARG002  (reserved for future weighted ordering)
+        limit: int = 5,
+    ) -> list[AiProviderKey]:
+        """Pick healthy unallocated keys from the shared pool.
+
+        Order: provider.tier (free first) → provider.priority asc →
+               key.monthly_used_tokens asc (load balance).
+        Caps at `limit` to avoid huge attempt loops.
+        """
+        from app.pi_ai_cloud.models import AiProvider  # local import (cycle guard)
+
+        tiers = list(allowed_tiers or ["free"])
+        q = (
+            select(AiProviderKey)
+            .join(AiProvider, AiProvider.id == AiProviderKey.provider_id)
+            .where(
+                AiProviderKey.status == "available",
+                AiProviderKey.allocated_to_license_id.is_(None),
+                AiProviderKey.health_status != "down",
+                AiProvider.is_enabled.is_(True),
+                AiProvider.health_status != "down",
+                AiProvider.tier.in_(tiers),
+            )
+            .order_by(
+                AiProvider.tier.asc(),
+                AiProvider.priority.asc(),
+                AiProviderKey.monthly_used_tokens.asc(),
+            )
+            .limit(limit)
+        )
+        return list((await self.db.execute(q)).scalars().all())
+
     # ─── Router query: keys FOR a specific license ─────────
     async def keys_for_license(self, license_id: int) -> list[AiProviderKey]:
         """All allocated + healthy keys belonging to one customer."""

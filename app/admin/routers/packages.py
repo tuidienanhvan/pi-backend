@@ -32,6 +32,10 @@ def _to_item(p: AiPackage) -> AdminPackageItem:
         price_cents_monthly=p.price_cents_monthly, price_cents_yearly=p.price_cents_yearly,
         token_quota_monthly=p.token_quota_monthly,
         allowed_qualities=list(p.allowed_qualities or []),
+        routing_mode=getattr(p, "routing_mode", "shared"),
+        allowed_tiers=list(getattr(p, "allowed_tiers", None) or ["free"]),
+        priority_boost=getattr(p, "priority_boost", 0) or 0,
+        dedicated_key_count=getattr(p, "dedicated_key_count", 0) or 0,
         features=list(p.features or []),
         sort_order=p.sort_order, is_active=p.is_active,
     )
@@ -150,6 +154,23 @@ async def assign_package(
         lp.current_period_tokens_used = 0
         lp.current_period_requests = 0
     await db.flush()
+
+    # T-20260513-001: auto-allocate dedicated keys when package requires them.
+    # Only acts when routing_mode in {"dedicated","hybrid"} AND
+    # dedicated_key_count > 0 AND license currently lacks allocated keys.
+    routing_mode = getattr(pkg, "routing_mode", "shared")
+    target_count = int(getattr(pkg, "dedicated_key_count", 0) or 0)
+    if routing_mode in {"dedicated", "hybrid"} and target_count > 0:
+        from app.pi_ai_cloud.services.key_allocator import KeyAllocator
+        allocator = KeyAllocator(db)
+        existing = await allocator.keys_for_license(license_id)
+        need = max(0, target_count - len(existing))
+        if need > 0:
+            await allocator.auto_allocate_to_license(
+                license_id=license_id,
+                count=need,
+                allowed_tiers=list(getattr(pkg, "allowed_tiers", None) or ["free"]),
+            )
 
     return await get_license_package(license_id, admin, db)  # type: ignore
 

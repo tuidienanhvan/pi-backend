@@ -49,6 +49,10 @@ class AdminLicenseItem(BaseModel):
     quota_limit: int = 0
     quota_pct: float = 0.0
     allocated_keys_count: int = 0
+    # Routing exposure (T-20260513-001)
+    routing_mode: Optional[str] = None       # "shared" | "dedicated" | "hybrid"
+    dedicated_keys_count: int = 0            # allocated keys currently held
+    dedicated_keys_target: int = 0           # package.dedicated_key_count target
     last_active_at: Optional[datetime] = None
 
 

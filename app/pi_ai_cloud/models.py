@@ -228,6 +228,23 @@ class AiPackage(Base, TimestampMixin):
     allowed_qualities: Mapped[list] = mapped_column(JSON, nullable=False)
     # ['fast'] | ['fast','balanced'] | ['fast','balanced','best']
 
+    # ─── Routing policy (T-20260513-001) ────────────────────────
+    routing_mode: Mapped[str] = mapped_column(String(16), default="shared", index=True)
+    # "shared"    — uses shared pool only (default, most customers)
+    # "dedicated" — requires dedicated allocated keys (enterprise)
+    # "hybrid"    — try dedicated first, fall back to shared
+
+    allowed_tiers: Mapped[list] = mapped_column(JSON, default=lambda: ["free"])
+    # Which provider tiers this package may hit: ["free"] | ["free","paid"]
+
+    priority_boost: Mapped[int] = mapped_column(Integer, default=0)
+    # Higher = served first when shared pool is contested.
+    # Free=0, Pro=10, Max=20, Enterprise=50.
+
+    dedicated_key_count: Mapped[int] = mapped_column(Integer, default=0)
+    # When routing_mode in {"dedicated","hybrid"}: auto-allocate N keys on assign.
+    # ─────────────────────────────────────────────────────────────
+
     features: Mapped[list] = mapped_column(JSON, default=list)
     # marketing bullets shown on pricing page
 

@@ -99,6 +99,11 @@ class AdminPackageItem(BaseModel):
     price_cents_yearly: int
     token_quota_monthly: int
     allowed_qualities: list[str]
+    # Routing policy (T-20260513-001)
+    routing_mode: str = "shared"
+    allowed_tiers: list[str] = ["free"]
+    priority_boost: int = 0
+    dedicated_key_count: int = 0
     features: list[str]
     sort_order: int
     is_active: bool
@@ -116,6 +121,11 @@ class AdminPackageCreate(BaseModel):
     price_cents_yearly: int = 0
     token_quota_monthly: int = 0
     allowed_qualities: list[str] = ["fast"]
+    # Routing policy (T-20260513-001)
+    routing_mode: str = "shared"
+    allowed_tiers: list[str] = ["free"]
+    priority_boost: int = 0
+    dedicated_key_count: int = 0
     features: list[str] = []
     sort_order: int = 100
     is_active: bool = True
@@ -128,6 +138,11 @@ class AdminPackagePatch(BaseModel):
     price_cents_yearly: Optional[int] = None
     token_quota_monthly: Optional[int] = None
     allowed_qualities: Optional[list[str]] = None
+    # Routing policy (T-20260513-001)
+    routing_mode: Optional[str] = None
+    allowed_tiers: Optional[list[str]] = None
+    priority_boost: Optional[int] = None
+    dedicated_key_count: Optional[int] = None
     features: Optional[list[str]] = None
     sort_order: Optional[int] = None
     is_active: Optional[bool] = None

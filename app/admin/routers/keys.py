@@ -263,3 +263,26 @@ async def reset_period(admin: CurrentAdmin, db: DbSession) -> dict:  # noqa: ARG
     """Manually trigger monthly reset (cron calls this)."""
     n = await KeyAllocator(db).reset_monthly_counters()
     return {"reset_count": n}
+
+
+# ─── Bulk release (T-20260513-001) ───────────────────────
+
+
+@router.post("/licenses/{license_id}/keys/release-all", status_code=200)
+async def release_all_keys_for_license(
+    license_id: int, admin: CurrentAdmin, db: DbSession, request: Request,
+) -> dict:
+    """Revoke ALL keys allocated to one license back to the shared pool.
+
+    Use cases: license downgrade from dedicated/hybrid → shared package,
+    customer cancels enterprise plan, admin wipes allocations to reset.
+    """
+    n = await KeyAllocator(db).revoke_all_for_license(license_id)
+    await AuditLogger.log(
+        db, actor_id=admin.id, actor_email=admin.email,
+        action="bulk_release", resource_type="license", resource_id=license_id,
+        resource_label=f"license #{license_id}",
+        message=f"Released {n} keys from license #{license_id} back to pool",
+        **_req_ctx(request),
+    )
+    return {"released_count": int(n), "license_id": license_id}

@@ -241,6 +241,8 @@ class AdminService:
             pkg_slug = pkg_name = None
             quota_used = quota_limit = 0
             quota_pct = 0.0
+            routing_mode: str | None = None
+            dedicated_target = 0
             if lic.id in packages_map:
                 lp, ap = packages_map[lic.id]
                 pkg_slug = ap.slug
@@ -248,7 +250,11 @@ class AdminService:
                 quota_used = int(lp.current_period_tokens_used or 0)
                 quota_limit = int(ap.token_quota_monthly or 0)
                 quota_pct = (quota_used / quota_limit * 100) if quota_limit > 0 else 0.0
+                # Routing exposure (T-20260513-001)
+                routing_mode = getattr(ap, "routing_mode", None)
+                dedicated_target = int(getattr(ap, "dedicated_key_count", 0) or 0)
 
+            allocated_count = int(keys_counts.get(lic.id, 0))
             items.append(AdminLicenseItem(
                 id=lic.id,
                 key=lic.key,
@@ -266,7 +272,10 @@ class AdminService:
                 quota_used=quota_used,
                 quota_limit=quota_limit,
                 quota_pct=round(quota_pct, 2),
-                allocated_keys_count=int(keys_counts.get(lic.id, 0)),
+                allocated_keys_count=allocated_count,
+                routing_mode=routing_mode,
+                dedicated_keys_count=allocated_count,
+                dedicated_keys_target=dedicated_target,
                 last_active_at=None,
             ))
 
