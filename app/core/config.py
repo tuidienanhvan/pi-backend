@@ -29,6 +29,18 @@ class Settings(BaseSettings):
     database_pool_size: int = 10
     database_max_overflow: int = 20
 
+    @field_validator("database_url", mode="after")
+    @classmethod
+    def _coerce_async_driver(cls, v: str) -> str:
+        """Railway/Heroku provide DATABASE_URL as `postgresql://...` but the
+        codebase uses asyncpg everywhere. Auto-upgrade the scheme so the same
+        env var works on every host without manual rewriting."""
+        if v.startswith("postgresql://"):
+            return v.replace("postgresql://", "postgresql+asyncpg://", 1)
+        if v.startswith("postgres://"):  # very old Heroku style
+            return v.replace("postgres://", "postgresql+asyncpg://", 1)
+        return v
+
     # ─── Redis / Celery ───────────────────────────────────
     redis_url: str = "redis://localhost:6379/0"
     celery_broker_url: str = "redis://localhost:6379/1"
