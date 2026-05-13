@@ -32,14 +32,39 @@ class Settings(BaseSettings):
     @field_validator("database_url", mode="after")
     @classmethod
     def _coerce_async_driver(cls, v: str) -> str:
-        """Railway/Heroku provide DATABASE_URL as `postgresql://...` but the
-        codebase uses asyncpg everywhere. Auto-upgrade the scheme so the same
-        env var works on every host without manual rewriting."""
+        """Normalize DATABASE_URL for asyncpg.
+
+        Common hosting providers (Neon, Supabase, Railway, Heroku) hand out
+        DATABASE_URL in a psycopg2-friendly shape:
+            postgresql://user:pass@host/db?sslmode=require&channel_binding=require
+        asyncpg uses a different parameter set and crashes on these query
+        flags. We:
+          1. Upgrade the scheme to `postgresql+asyncpg://` so SQLAlchemy
+             picks the async driver.
+          2. Drop libpq-only flags asyncpg doesn't understand
+             (`sslmode`, `channel_binding`).
+          3. Translate `sslmode=require` → `ssl=true` so TLS still happens
+             on hosts that require it (Neon, Supabase, Railway managed PG).
+        """
+        from urllib.parse import urlsplit, urlunsplit, parse_qsl, urlencode
+
+        # Step 1: scheme normalize
         if v.startswith("postgresql://"):
-            return v.replace("postgresql://", "postgresql+asyncpg://", 1)
-        if v.startswith("postgres://"):  # very old Heroku style
-            return v.replace("postgres://", "postgresql+asyncpg://", 1)
-        return v
+            v = v.replace("postgresql://", "postgresql+asyncpg://", 1)
+        elif v.startswith("postgres://"):  # legacy Heroku
+            v = v.replace("postgres://", "postgresql+asyncpg://", 1)
+
+        # Step 2 & 3: scrub libpq-only query params
+        parts = urlsplit(v)
+        if not parts.query:
+            return v
+        params = dict(parse_qsl(parts.query, keep_blank_values=True))
+        sslmode = params.pop("sslmode", None)
+        params.pop("channel_binding", None)  # asyncpg ignores; libpq-only
+        if sslmode in {"require", "verify-ca", "verify-full"} and "ssl" not in params:
+            params["ssl"] = "true"
+        new_query = urlencode(params)
+        return urlunsplit((parts.scheme, parts.netloc, parts.path, new_query, parts.fragment))
 
     # ─── Redis / Celery ───────────────────────────────────
     redis_url: str = "redis://localhost:6379/0"
