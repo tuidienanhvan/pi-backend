@@ -6,6 +6,8 @@ from urllib.parse import urlparse
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import settings
+from app.saas.jwt import create_tenant_token
 from app.shared.license.models import License, Site
 from app.shared.usage import UsageLog
 
@@ -25,7 +27,7 @@ class LicenseService:
             Site.license_id == lic.id, Site.is_active.is_(True)
         )
         result = await self.db.execute(q)
-        return int(result.scalar_one())
+        return result.scalar_one()
 
     async def site_is_activated(self, lic: License, site_url: str) -> bool:
         domain = self._normalise_domain(site_url)
@@ -47,7 +49,7 @@ class LicenseService:
             UsageLog.status == "success",
         )
         result = await self.db.execute(q)
-        return int(result.scalar_one())
+        return result.scalar_one()
 
     # ─── Mutations ───────────────────────────────────────
     async def activate_site(
@@ -156,6 +158,16 @@ class LicenseService:
         site.app_pass = app_pass
         await self.db.flush()
         return True
+
+    def issue_jwt(self, lic: License) -> tuple[str, int]:
+        """Generate a JWT for the plugin to use for subsequent API calls."""
+        return create_tenant_token(
+            tenant_id=lic.id,
+            domain="license-auth",  # Placeholder for license-based auth
+            tier=lic.tier,
+            features=[],  # Features are gated by tier in the plugin
+            expires_minutes=settings.tenant_jwt_expire_minutes,
+        )
 
     # ─── Helpers ─────────────────────────────────────────
     @staticmethod

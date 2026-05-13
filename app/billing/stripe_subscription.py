@@ -72,7 +72,7 @@ async def sync_token_quota(db: AsyncSession, tenant: Tenant, *, reset_used: bool
     if token is None:
         return
     quota = TIER_TOKEN_QUOTA.get(tenant.tier, TIER_TOKEN_QUOTA["free"])
-    token.monthly_quota = int(quota or -1)
+    token.monthly_quota = quota or -1
     if reset_used:
         token.used_this_month = 0
     if tenant.subscription_current_period_end is not None:
