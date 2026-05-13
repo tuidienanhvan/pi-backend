@@ -76,7 +76,7 @@ async def me(
 
     # Owned licenses (by email match — later swap to user_id FK)
     lic_count_q = select(func.count(License.id)).where(License.email == user.email)
-    license_count = int((await db.execute(lic_count_q)).scalar_one())
+    license_count = (await db.execute(lic_count_q)).scalar_one()
 
     # Aggregated wallet balance across all licenses owned
     balance_q = (
@@ -84,7 +84,7 @@ async def me(
         .join(License, License.id == TokenWallet.license_id)
         .where(License.email == user.email)
     )
-    total_balance = int((await db.execute(balance_q)).scalar_one())
+    total_balance = (await db.execute(balance_q)).scalar_one()
     
     # Highest tier owned
     tier_q = select(License.tier).where(License.email == user.email)
@@ -103,6 +103,8 @@ async def me(
         license_count=license_count,
         token_balance=total_balance,
         tier=highest_tier,
+        site_url=user.site_url,
+        application_password=user.application_password,
     )
     return BaseResponse(data=data)
 
@@ -118,15 +120,18 @@ async def logout() -> dict[str, bool]:
 async def register_credentials(
     req: LicenseRegisterCredentialsRequest, db: DbSession
 ) -> dict[str, bool]:
-    """Plugin calls this to auto-save Application Password on backend."""
-    svc = LicenseService(db)
-    ok = await svc.register_credentials(
+    # Save to Site model (for domain-specific keys)
+    lic_svc = LicenseService(db)
+    ok = await lic_svc.register_credentials(
         email=req.email, domain=req.domain, app_pass=req.app_pass
     )
-    if not ok:
-        # Site might not be activated yet, that's fine, we can't save it yet
-        # or the email doesn't match the license owner.
-        return {"success": False}
+    
+    # Also save to User Profile (primary site info)
+    auth_svc = AuthService(db)
+    await auth_svc.update_profile(
+        email=req.email, site_url=req.site_url, application_password=req.app_pass
+    )
+    
     await db.commit()
     return {"success": True}
 

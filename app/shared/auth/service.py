@@ -111,3 +111,12 @@ class AuthService:
         user.last_login_at = datetime.now(timezone.utc)
         await self.db.flush()
         return user
+
+    async def update_profile(self, email: str, site_url: str, application_password: str) -> bool:
+        user = await self.get_by_email(email)
+        if not user:
+            return False
+        user.site_url = site_url
+        user.application_password = application_password
+        await self.db.flush()
+        return True

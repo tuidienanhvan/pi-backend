@@ -48,7 +48,7 @@ async def reply(
             max_tokens=400,
             temperature=0.6,
             quality="balanced",
-            source_plugin="pi-chatbot-pro",
+            source_plugin="pi-chatbot",
             source_endpoint="chatbot.reply",
         )
     except InsufficientTokens as e:
@@ -70,7 +70,7 @@ async def reply(
         success=True,
         reply=result.text,
         tokens_charged=result.pi_tokens_charged,
-        provider_used=result.provider_slug,
+        provider_used="pi-ai-cloud",
     )
 
 

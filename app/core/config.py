@@ -20,12 +20,12 @@ class Settings(BaseSettings):
     # ─── App ──────────────────────────────────────────────
     app_env: Literal["development", "staging", "production"] = "development"
     app_debug: bool = True
-    app_secret_key: str = Field(..., min_length=32)
+    app_secret_key: str = Field("change-me-to-64-random-chars", min_length=16)
     app_base_url: str = "http://localhost:8000"
     app_cors_origins: str = "http://localhost"
 
     # ─── Database ─────────────────────────────────────────
-    database_url: str
+    database_url: str = "postgresql+asyncpg://pi:pi@localhost:5432/pi_backend"
     database_pool_size: int = 10
     database_max_overflow: int = 20
 
@@ -35,7 +35,7 @@ class Settings(BaseSettings):
     celery_result_backend: str = "redis://localhost:6379/2"
 
     # ─── JWT ──────────────────────────────────────────────
-    jwt_secret: str = Field(..., min_length=32)
+    jwt_secret: str = Field("change-me-to-64-random-chars", min_length=16)
     jwt_algorithm: str = "HS256"
     jwt_expire_minutes: int = 10080  # 7 days
     tenant_jwt_expire_minutes: int = 15
@@ -44,12 +44,6 @@ class Settings(BaseSettings):
     license_key_prefix: str = "pi_"
     license_default_tier: Literal["free", "pro", "max", "enterprise"] = "free"
     tenant_license_key_pattern: str = r"^[A-Z0-9]{4,8}-[A-Z0-9]{5,8}-[A-Z0-9]{5}-[A-Z0-9]{5}$"
-
-    # ─── AI ───────────────────────────────────────────────
-    anthropic_api_key: str = ""
-    anthropic_model: str = "claude-sonnet-4-5-20250929"
-    openai_api_key: str = ""
-    openai_model: str = "gpt-4o-mini"
 
     # ─── Google APIs (PageSpeed, Indexing) ────────────────
     google_psi_api_key: str = ""  # public free tier: 25K/day without key

@@ -1,21 +1,21 @@
-"""SEO Bot endpoints — AI-powered title/desc/OG generation."""
+"""SEO Bot endpoints powered by Pi AI Cloud."""
 
 import time
 
 from fastapi import APIRouter
 
 from app.core.deps import DbSession, RateLimitedLicense
+from app.pi_ai_cloud.services.completion import CompletionService
 from app.pi_seo.schemas import (
     SeoBotBulkRequest,
     SeoBotBulkResponse,
     SeoBotGenerateRequest,
     SeoBotGenerateResponse,
 )
-from app.shared.license.service import LicenseService
 from app.pi_seo.services.seo_bot import SeoBotService
+from app.shared.license.service import LicenseService
 
 router = APIRouter()
-_svc = SeoBotService()
 
 
 @router.post("/generate", response_model=SeoBotGenerateResponse)
@@ -24,20 +24,16 @@ async def generate(
     lic: RateLimitedLicense,
     db: DbSession,
 ) -> SeoBotGenerateResponse:
-    """Generate N variants of SEO title + meta description.
-
-    The Pi SEO plugin should call this instead of computing locally —
-    the prompt engineering is our IP and stays server-side.
-    """
     started = time.perf_counter()
-    svc_lic = LicenseService(db)
-    domain = svc_lic._normalise_domain(req.site_url)
+    license_service = LicenseService(db)
+    domain = license_service._normalise_domain(req.site_url)
+    service = SeoBotService(CompletionService(db))
 
     try:
-        variants, meta = await _svc.generate(req)
+        variants, meta = await service.generate(lic, req)
     except Exception as e:
         latency = int((time.perf_counter() - started) * 1000)
-        await svc_lic.log_usage(
+        await license_service.log_usage(
             lic,
             "seo_bot.generate",
             site_domain=domain,
@@ -47,20 +43,10 @@ async def generate(
         )
         raise
 
-    latency = int((time.perf_counter() - started) * 1000)
-    await svc_lic.log_usage(
-        lic,
-        "seo_bot.generate",
-        site_domain=domain,
-        tokens_input=meta["input_tokens"],
-        tokens_output=meta["output_tokens"],
-        latency_ms=latency,
-    )
-
     return SeoBotGenerateResponse(
         success=True,
         variants=variants,
-        tokens_used=meta["input_tokens"] + meta["output_tokens"],
+        tokens_used=meta["pi_tokens_charged"],
         model=meta["model"],
     )
 
@@ -71,7 +57,6 @@ async def bulk_generate(
     lic: RateLimitedLicense,
     db: DbSession,  # noqa: ARG001
 ) -> SeoBotBulkResponse:
-    """Queue bulk AI generation — runs in Celery worker, returns task_id."""
     if lic.tier not in ("pro", "max", "enterprise"):
         from app.core.exceptions import LicenseInvalid
 
@@ -84,13 +69,12 @@ async def bulk_generate(
         success=True,
         task_id=task.id,
         queued=len(req.posts),
-        message=f"Queued {len(req.posts)} posts — check /v1/seo-bot/status/{task.id}",
+        message=f"Queued {len(req.posts)} posts - check /v1/seo-bot/status/{task.id}",
     )
 
 
 @router.get("/status/{task_id}")
 async def task_status(task_id: str, lic: RateLimitedLicense) -> dict:  # noqa: ARG001
-    """Check status of a queued bulk task."""
     from app.worker import celery_app
 
     async_result = celery_app.AsyncResult(task_id)

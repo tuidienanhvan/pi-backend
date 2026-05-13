@@ -46,7 +46,7 @@ async def score(
             max_tokens=150,
             temperature=0.3,
             quality="fast",
-            source_plugin="pi-leads-pro",
+            source_plugin="pi-leads",
             source_endpoint="leads.score",
         )
     except InsufficientTokens as e:

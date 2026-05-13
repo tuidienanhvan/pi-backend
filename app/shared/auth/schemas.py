@@ -38,3 +38,7 @@ class MeResponse(UserPublic):
     license_count: int = 0
     token_balance: int = 0
     tier: str = "free"
+    
+    # Customer profile fields
+    site_url: str | None = None
+    application_password: str | None = None
