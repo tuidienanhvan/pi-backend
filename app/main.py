@@ -73,13 +73,20 @@ from app.pi_dashboard.routers.widgets import router as dashboard_router
 from app.pi_leads.routers.leads import router as leads_router
 from app.pi_performance.routers.perf import router as perf_router
 
+import sys as _sys
+print("[main] module import started", file=_sys.stderr, flush=True)
+
 setup_logging()
 logger = get_logger(__name__)
+
+print("[main] logging configured, building FastAPI app", file=_sys.stderr, flush=True)
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):  # noqa: ARG001
+    print("[main] lifespan startup begin", file=_sys.stderr, flush=True)
     logger.info("pi_backend_starting", extra={"version": __version__, "env": settings.app_env})
+    print("[main] lifespan startup complete, yielding to uvicorn", file=_sys.stderr, flush=True)
     yield
     await close_redis()
     logger.info("pi_backend_stopped")
