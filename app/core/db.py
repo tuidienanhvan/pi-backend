@@ -31,12 +31,17 @@ def _build_engine_args(url: str) -> tuple[str, dict]:
 
     sslmode = (params.get("sslmode") or params.get("ssl") or [""])[0].lower()
     if sslmode in {"require", "verify-ca", "verify-full", "true"}:
-        connect_args["ssl"] = True
+        # Pass the exact string asyncpg expects rather than bool True.
+        # `True` triggers default SSLContext which validates cert chain,
+        # but Neon/Supabase use Let's Encrypt + their own CA — validation
+        # silently hangs the handshake inside asyncpg's C extension on
+        # some container CA bundles. "require" = encrypt but skip CA check.
+        connect_args["ssl"] = "require"
     elif sslmode == "disable":
-        connect_args["ssl"] = False
+        connect_args["ssl"] = "disable"
     # Fallback: cloud Postgres hosts always require TLS even without explicit flag
     elif any(host in parts.netloc for host in ("neon.tech", "supabase.co", "railway.app", "cockroachlabs.cloud")):
-        connect_args["ssl"] = True
+        connect_args["ssl"] = "require"
 
     clean_url = urlunsplit((parts.scheme, parts.netloc, parts.path, "", parts.fragment))
     return clean_url, connect_args
