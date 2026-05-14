@@ -33,12 +33,17 @@ COPY migrations ./migrations
 COPY alembic.ini .
 COPY scripts    ./scripts
 
-# Create non-root user
-RUN groupadd -r pi && useradd -r -g pi pi \
+# Create non-root user with a writable home dir.
+# Gunicorn's control server tries to create a socket under $HOME; without
+# /home/pi the worker logs `Control server error: [Errno 13] Permission
+# denied: '/home/pi'` on every startup. Harmless but noisy — give it a
+# real home so the socket bind succeeds silently.
+RUN groupadd -r pi && useradd -r -g pi -m -d /home/pi pi \
     && mkdir -p /app/data /app/logs \
-    && chown -R pi:pi /app
+    && chown -R pi:pi /app /home/pi
 
 USER pi
+ENV HOME=/home/pi
 
 # Allow port to be set via env var (default to 8000 for local)
 ENV PORT=8000
