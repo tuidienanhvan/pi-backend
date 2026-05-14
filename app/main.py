@@ -13,21 +13,36 @@ URL prefix convention:
   /v1/dashboard/*  — Pi Dashboard
 """
 
+# ── BOOT TRACE ──────────────────────────────────────────────────────────
+# These prints fire BEFORE the import block below so we can identify the
+# precise module whose top-level code hangs (e.g. eager Redis/DB connect
+# at import time). Each `import` statement gets its own line.
+import sys as _sys
+def _trace(msg):
+    print(f"[main] {msg}", file=_sys.stderr, flush=True)
+
+_trace("boot: starting imports")
+
 from contextlib import asynccontextmanager
 
+_trace("boot: stdlib done, importing fastapi")
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 import os
 
+_trace("boot: importing app.core.config")
 from app import __version__
 from app.core.config import settings
+_trace("boot: importing app.core.exceptions + logging + middleware")
 from app.core.exceptions import register_exception_handlers
 from app.core.logging_conf import get_logger, setup_logging
 from app.core.middleware import RequestContextMiddleware
+_trace("boot: importing redis_client")
 from app.core.redis_client import close_redis
 
 # Shared
+_trace("boot: importing shared routers")
 from app.shared.auth.router import router as auth_router
 from app.shared.health import router as health_router
 from app.shared.license.router import router as license_router
@@ -35,11 +50,13 @@ from app.shared.telemetry.router import router as telemetry_router
 from app.shared.updates.router import router as updates_router
 from app.shared.license.usage_router import router as usage_report_router
 
+_trace("boot: importing saas + billing")
 from app.saas.admin_router import router as saas_admin_router
 from app.saas.auth_router import router as saas_auth_router
 from app.billing.router import router as billing_router
 
 # Admin domain (requires admin JWT)
+_trace("boot: importing admin routers")
 from app.admin.routers.overview import router as admin_overview_router
 from app.admin.routers.licenses import router as admin_licenses_router
 from app.admin.routers.users import router as admin_users_router
@@ -54,12 +71,14 @@ from app.admin.routers.audit import router as admin_audit_router
 from app.admin.routers.cron import router as admin_cron_router
 
 # Pi AI Cloud (tokens + AI completion)
+_trace("boot: importing pi_ai_cloud routers")
 from app.pi_ai_cloud.routers.complete import router as ai_complete_router
 from app.pi_ai_cloud.routers.tokens import router as ai_tokens_router
 from app.pi_ai_cloud.routers.cloud import router as ai_cloud_router
 from app.pi_ai_cloud.routers.public import router as public_router
 
 # Pi SEO
+_trace("boot: importing pi_seo routers")
 from app.pi_seo.routers.audit import router as seo_audit_router
 from app.pi_seo.routers.schema import router as seo_schema_router
 from app.pi_seo.routers.seo_bot import router as seo_bot_router
@@ -67,11 +86,14 @@ from app.pi_seo.routers.psi import router as seo_psi_router
 from app.pi_seo.routers.indexing import router as seo_indexing_router
 
 # Other plugins (scaffolds)
+_trace("boot: importing other plugin routers")
 from app.pi_analytics.routers.events import router as analytics_router
 from app.pi_chatbot.routers.chat import router as chatbot_router
 from app.pi_dashboard.routers.widgets import router as dashboard_router
 from app.pi_leads.routers.leads import router as leads_router
 from app.pi_performance.routers.perf import router as perf_router
+
+_trace("boot: all imports complete")
 
 import sys as _sys
 print("[main] module import started", file=_sys.stderr, flush=True)
