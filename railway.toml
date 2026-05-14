@@ -16,7 +16,7 @@ restartPolicyMaxRetries = 3
 # Hardcode --workers=2 to avoid shell-expansion edge cases on Railway's
 # runner (some shells don't expand ${VAR:-default} syntax). Plenty for
 # free-tier traffic; scale via Railway dashboard when needed.
-startCommand = "set -e; echo '[start] alembic begin'; alembic upgrade head; echo \"[start] alembic done, PORT=$PORT\"; exec gunicorn app.main:app --worker-class=uvicorn.workers.UvicornWorker --bind=0.0.0.0:${PORT:-8000} --workers=2 --timeout=60 --access-logfile=- --error-logfile=- --log-level=info"
+startCommand = "bash scripts/start.sh"
 
 # Env vars managed via Railway dashboard — see /core/config.py for full list.
 # Bare minimum: DATABASE_URL, REDIS_URL, JWT_SECRET, APP_SECRET_KEY, CRON_SECRET,
