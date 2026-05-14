@@ -44,21 +44,15 @@ def do_run_migrations(connection: Connection) -> None:
 
 
 async def run_async_migrations() -> None:
-    import sys
-    print(f"[alembic] connecting to: {_clean_url[:80]}...", file=sys.stderr, flush=True)
-    print(f"[alembic] connect_args: {_connect_args}", file=sys.stderr, flush=True)
     connectable = async_engine_from_config(
         config.get_section(config.config_ini_section, {}),
         prefix="sqlalchemy.",
         poolclass=pool.NullPool,
-        connect_args=_connect_args,  # pass SSL through to asyncpg
+        connect_args=_connect_args,  # SSL flags from DATABASE_URL → asyncpg
     )
-    print("[alembic] engine created, opening connection...", file=sys.stderr, flush=True)
     async with connectable.connect() as conn:
-        print("[alembic] connection open, running migrations...", file=sys.stderr, flush=True)
         await conn.run_sync(do_run_migrations)
     await connectable.dispose()
-    print("[alembic] all migrations applied.", file=sys.stderr, flush=True)
 
 
 def run_migrations_online() -> None:
