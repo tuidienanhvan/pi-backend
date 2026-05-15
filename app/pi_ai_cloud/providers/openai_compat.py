@@ -22,11 +22,16 @@ class OpenAICompatAdapter(ProviderAdapter):
         temperature: float,
         api_key: str,
         base_url: str,
+        extra_headers: dict | None = None,
     ) -> CompletionResult:
         headers = {
             "Content-Type": "application/json",
             "Authorization": f"Bearer {api_key}",
         }
+        # Provider-specific headers (e.g. custom auth schemes). Allow override
+        # of defaults so admin can set `Authorization: ApiKey ...` if needed.
+        if extra_headers:
+            headers.update({str(k): str(v) for k, v in extra_headers.items() if v})
         payload = {
             "model": model_id,
             "messages": messages,

@@ -116,6 +116,13 @@ class AdminUserProfilePatch(BaseModel):
 
 # ─── Providers ─────────────────────────────────────────
 
+class ProviderModelSpec(BaseModel):
+    """Kilo-Code-style model entry exposed by a provider."""
+    id: str
+    name: str = ""
+    reasoning: bool = False
+
+
 class AdminProviderItem(BaseModel):
     id: int
     slug: str
@@ -123,6 +130,8 @@ class AdminProviderItem(BaseModel):
     adapter: str
     base_url: str
     model_id: str
+    models: list[ProviderModelSpec] = []
+    extra_headers: dict[str, str] = {}
     tier: str
     priority: int
     is_enabled: bool
@@ -152,6 +161,8 @@ class AdminProviderPatch(BaseModel):
     adapter: Optional[str] = None
     base_url: Optional[str] = None
     model_id: Optional[str] = None
+    models: Optional[list[ProviderModelSpec]] = None
+    extra_headers: Optional[dict[str, str]] = None
     is_enabled: Optional[bool] = None
     priority: Optional[int] = None
     tier: Optional[str] = None
@@ -168,7 +179,9 @@ class AdminProviderCreate(BaseModel):
     display_name: str
     adapter: str = "openai_compat"
     base_url: str
-    model_id: str
+    model_id: str = ""  # optional if models[] is provided — falls back to models[0].id
+    models: list[ProviderModelSpec] = []
+    extra_headers: dict[str, str] = {}
     tier: str = "free"
     priority: int = 100
     input_cost_per_mtok_cents: int = 0

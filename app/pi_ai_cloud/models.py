@@ -98,6 +98,15 @@ class AiProvider(Base, TimestampMixin):
     base_url: Mapped[str] = mapped_column(String(500))
     model_id: Mapped[str] = mapped_column(String(128))
     # Real upstream model: "gemini-2.0-flash-exp", "llama-3.3-70b-versatile"
+    # Kept for backward compat — equals models[0].id when models[] non-empty.
+
+    # Kilo-Code-style multi-model declaration. Each entry:
+    #   { "id": "gpt-4o-mini", "name": "GPT-4o mini", "reasoning": false }
+    models: Mapped[list] = mapped_column(JSON, default=list, nullable=False)
+
+    # Arbitrary HTTP headers injected into upstream requests (e.g. for
+    # providers that auth via custom headers instead of `Authorization: Bearer`).
+    extra_headers: Mapped[dict] = mapped_column(JSON, default=dict, nullable=False)
 
     # NOTE: API keys live in ai_provider_keys (pool). This table is metadata only.
 

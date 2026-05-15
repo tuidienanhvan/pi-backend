@@ -431,7 +431,10 @@ class AdminService:
         keys_total = sum(int(v) for v in counts.values())
         return AdminProviderItem(
             id=p.id, slug=p.slug, display_name=p.display_name, adapter=p.adapter,
-            base_url=p.base_url, model_id=p.model_id, tier=p.tier, priority=p.priority,
+            base_url=p.base_url, model_id=p.model_id,
+            models=p.models or [],
+            extra_headers=p.extra_headers or {},
+            tier=p.tier, priority=p.priority,
             is_enabled=p.is_enabled, health_status=p.health_status,
             input_cost_per_mtok_cents=p.input_cost_per_mtok_cents,
             output_cost_per_mtok_cents=p.output_cost_per_mtok_cents,
@@ -466,6 +469,17 @@ class AdminService:
             val = getattr(payload, field, None)
             if val is not None:
                 setattr(p, field, val)
+
+        # models[] + extra_headers — serialised as JSON-compatible primitives
+        models_val = getattr(payload, "models", None)
+        if models_val is not None:
+            p.models = [m.model_dump() if hasattr(m, "model_dump") else dict(m) for m in models_val]
+            # Mirror models[0].id into legacy model_id for backward compat
+            if p.models:
+                p.model_id = p.models[0]["id"]
+        headers_val = getattr(payload, "extra_headers", None)
+        if headers_val is not None:
+            p.extra_headers = dict(headers_val)
         await self.db.flush()
 
         # Back-compat: if admin typed an api_key in old UI, drop it into the pool
@@ -478,12 +492,25 @@ class AdminService:
         return p
 
     async def create_provider(self, payload) -> AiProvider:
+        # Normalise models[]: accept either explicit list or single legacy model_id
+        models_list = [
+            (m.model_dump() if hasattr(m, "model_dump") else dict(m))
+            for m in (payload.models or [])
+        ]
+        legacy_model_id = (payload.model_id or "").strip()
+        if not models_list and legacy_model_id:
+            models_list = [{"id": legacy_model_id, "name": payload.display_name, "reasoning": False}]
+        if not legacy_model_id and models_list:
+            legacy_model_id = models_list[0]["id"]
+
         p = AiProvider(
             slug=payload.slug.strip(),
             display_name=payload.display_name.strip(),
             adapter=payload.adapter,
             base_url=payload.base_url.strip(),
-            model_id=payload.model_id.strip(),
+            model_id=legacy_model_id,
+            models=models_list,
+            extra_headers=dict(payload.extra_headers or {}),
             tier=payload.tier,
             priority=payload.priority,
             input_cost_per_mtok_cents=payload.input_cost_per_mtok_cents,

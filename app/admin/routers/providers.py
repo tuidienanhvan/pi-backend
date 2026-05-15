@@ -103,6 +103,7 @@ async def test_provider(
             temperature=0.0,
             api_key=api_key,
             base_url=p.base_url,
+            extra_headers=p.extra_headers or {},
         )
         latency = int((time.perf_counter() - started) * 1000)
         return AdminProviderTestResult(ok=True, latency_ms=latency, sample=(result.text or "")[:200])

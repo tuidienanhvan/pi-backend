@@ -149,6 +149,7 @@ class CompletionService:
                     temperature=temperature,
                     api_key=api_key,
                     base_url=provider.base_url,
+                    extra_headers=provider.extra_headers or {},
                 )
                 latency = int((time.perf_counter() - started) * 1000)
                 await self.allocator.mark_health(key.id, success=True)

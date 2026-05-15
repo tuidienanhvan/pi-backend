@@ -28,6 +28,7 @@ class ProviderAdapter(ABC):
         temperature: float,
         api_key: str,
         base_url: str,
+        extra_headers: dict | None = None,
     ) -> CompletionResult:
         """Call the upstream AI and return normalised result.
 
