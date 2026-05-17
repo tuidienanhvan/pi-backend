@@ -6,6 +6,7 @@ from sqlalchemy import select
 from app.core.config import settings
 from app.core.deps import CurrentLicense, DbSession, LicenseForActivate
 from app.pi_ai_cloud.models import AiPackage, LicensePackage
+from app.saas.tiers import monthly_quota_for_tier
 from app.shared.license.schemas import (
     LicenseActivateRequest,
     LicenseActivateResponse,
@@ -105,7 +106,7 @@ async def stats(lic: LicenseForActivate, db: DbSession) -> LicenseStatsResponse:
     svc = LicenseService(db)
     count = await svc.activated_sites_count(lic)
     usage = await svc.usage_this_month(lic)
-    quota = settings.monthly_quota_for.get(lic.tier, settings.rate_limit_free_per_month)
+    quota = monthly_quota_for_tier(lic.tier)  # -1 = unlimited
 
     # Pi AI Cloud package (optional, separate from license tier)
     pkg_row = await db.execute(

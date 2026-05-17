@@ -64,11 +64,16 @@ class Settings(BaseSettings):
     google_psi_api_key: str = ""  # public free tier: 25K/day without key
     google_indexing_service_account_json: str = ""  # path to JSON credential
 
-    # ─── Rate limits (per-month quotas) ───────────────────
-    rate_limit_free_per_month: int = 5_000
-    rate_limit_pro_per_month: int = 100_000
-    rate_limit_max_per_month: int = 500_000
-    rate_limit_burst_per_minute: int = 10
+    # ─── Rate limits ──────────────────────────────────────
+    # NOTE: Per-tier monthly quotas now live in `app.saas.tiers.TIER_MATRIX`
+    # (single source of truth). The `rate_limit_*_per_month` env vars are
+    # DEPRECATED — kept here only so existing Railway env vars with these
+    # names don't trigger a pydantic validation error on boot. Callers
+    # MUST use `monthly_quota_for_tier(tier)` from `app.saas.tiers`.
+    rate_limit_free_per_month: int = 50_000   # deprecated — see saas.tiers
+    rate_limit_pro_per_month: int = 1_000_000  # deprecated
+    rate_limit_max_per_month: int = 3_000_000  # deprecated
+    rate_limit_burst_per_minute: int = 10      # still active — burst limiter
 
     # ─── Plugin updates ───────────────────────────────────
     updates_storage_path: str = "./data/plugin-releases"
@@ -94,11 +99,15 @@ class Settings(BaseSettings):
 
     @property
     def monthly_quota_for(self) -> dict[str, int]:
+        """DEPRECATED — use `app.saas.tiers.monthly_quota_for_tier(tier)`.
+
+        Kept as a proxy for any third-party callers; reads from the
+        canonical TIER_MATRIX so values cannot drift.
+        """
+        from app.saas.tiers import TIER_MATRIX
         return {
-            "free": self.rate_limit_free_per_month,
-            "pro": self.rate_limit_pro_per_month,
-            "max": self.rate_limit_max_per_month,
-            "enterprise": -1,
+            tier: (-1 if spec["monthly_tokens"] == -1 else spec["monthly_tokens"])
+            for tier, spec in TIER_MATRIX.items()
         }
 
 

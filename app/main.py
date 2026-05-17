@@ -37,6 +37,7 @@ from app.shared.license.usage_router import router as usage_report_router
 
 from app.saas.admin_router import router as saas_admin_router
 from app.saas.auth_router import router as saas_auth_router
+from app.saas.tier_router import router as saas_tier_router
 from app.billing.router import router as billing_router
 
 # Admin domain (requires admin JWT)
@@ -119,6 +120,7 @@ app.include_router(telemetry_router, prefix="/v1/telemetry", tags=["shared: tele
 app.include_router(usage_report_router, prefix="/v1/usage", tags=["shared: usage"])
 
 app.include_router(saas_auth_router, prefix="/auth", tags=["saas: pi-api auth"])
+app.include_router(saas_tier_router, prefix="/v1/tiers", tags=["saas: tier spec"])
 app.include_router(billing_router, prefix="/v1/billing", tags=["billing: subscriptions"])
 
 # Admin (all under /v1/admin, require admin JWT)
