@@ -17,15 +17,34 @@ from app.shared.schemas.responses import BaseResponse
 router = APIRouter()
 
 
-def _item(tenant: Tenant) -> TenantItem:
+async def _item(tenant: Tenant, db: DbSession | None = None) -> TenantItem:
+    """Build the TenantItem response. If db session is passed, also load the
+    token wallet so admin UI can show balance/quota at a glance."""
+    balance = 0
+    quota = 0
+    used = 0
+    if db is not None:
+        wallet = (
+            await db.execute(select(Token).where(Token.tenant_id == tenant.id))
+        ).scalar_one_or_none()
+        if wallet is not None:
+            balance = int(wallet.balance or 0)
+            quota = int(wallet.monthly_quota or 0)
+            used = int(wallet.used_this_month or 0)
+
     return TenantItem(
         id=tenant.id,
         domain=tenant.domain,
         site_url=tenant.site_url,
+        license_key=tenant.license_key,
         tier=tenant.tier,
         status=tenant.status,
         features=list(tenant.features or []),
         last_seen_at=tenant.last_seen_at,
+        activated_at=tenant.activated_at,
+        tokens_balance=balance,
+        tokens_monthly_quota=quota,
+        tokens_used_this_month=used,
     )
 
 
@@ -52,6 +71,7 @@ async def list_tenants(
     admin: User = Depends(get_admin_user),  # noqa: ARG001
     status_filter: str = Query("", alias="status"),
     tier: str = "",
+    q: str = Query("", description="Free-text search across domain + license_key"),
     limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0),
 ) -> BaseResponse[list[TenantItem]]:
@@ -60,9 +80,27 @@ async def list_tenants(
         stmt = stmt.where(Tenant.status == status_filter)
     if tier:
         stmt = stmt.where(Tenant.tier == normalize_tier(tier))
+    if q:
+        pattern = f"%{q}%"
+        stmt = stmt.where(
+            (Tenant.domain.ilike(pattern)) | (Tenant.license_key.ilike(pattern))
+        )
     tenants = (await db.execute(stmt)).scalars().all()
-    data = [_item(tenant) for tenant in tenants]
+    data = [await _item(tenant, db) for tenant in tenants]
     return BaseResponse(data=data, meta={"limit": limit, "offset": offset, "count": len(data)})
+
+
+@router.get("/tenants/{tenant_id}", response_model=BaseResponse[TenantItem])
+async def get_tenant(
+    tenant_id: int,
+    db: DbSession,
+    admin: User = Depends(get_admin_user),  # noqa: ARG001
+) -> BaseResponse[TenantItem]:
+    """Single-tenant fetch — used by TenantDetailPage in admin UI."""
+    tenant = await db.get(Tenant, tenant_id)
+    if tenant is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Tenant not found")
+    return BaseResponse(data=await _item(tenant, db))
 
 
 @router.post("/tenants", response_model=BaseResponse[TenantItem], status_code=status.HTTP_201_CREATED)
@@ -88,7 +126,7 @@ async def create_tenant(
     await db.flush()
     db.add(Token(tenant_id=tenant.id, monthly_quota=monthly_quota_for_tier(tier)))
     await _audit(db, admin, "admin.tenant.create", tenant, {"tier": tier})
-    return BaseResponse(data=_item(tenant), message="Tenant created successfully")
+    return BaseResponse(data=await _item(tenant, db), message="Tenant created successfully")
 
 
 @router.patch("/tenants/{tenant_id}", response_model=BaseResponse[TenantItem])
@@ -112,7 +150,7 @@ async def update_tenant(
     if payload.features is not None:
         tenant.features = payload.features
     await _audit(db, admin, "admin.tenant.update", tenant, {"before": before})
-    return BaseResponse(data=_item(tenant), message="Tenant updated successfully")
+    return BaseResponse(data=await _item(tenant, db), message="Tenant updated successfully")
 
 
 @router.post("/tenants/{tenant_id}/tokens/recharge", response_model=BaseResponse[dict])

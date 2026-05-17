@@ -60,10 +60,15 @@ class TenantItem(BaseModel):
     id: int
     domain: str
     site_url: str
+    license_key: str = ""              # admin can see; not exposed to customer-side flows
     tier: str
     status: str
     features: list[str]
     last_seen_at: datetime | None = None
+    activated_at: datetime | None = None
+    tokens_balance: int = 0            # wallet balance (0 if no wallet exists yet)
+    tokens_monthly_quota: int = 0      # per-month cap from tier (-1 = unlimited)
+    tokens_used_this_month: int = 0
 
 
 class TenantCreate(BaseModel):
