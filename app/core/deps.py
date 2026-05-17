@@ -10,6 +10,7 @@ from app.core.config import settings
 from app.core.db import get_db
 from app.shared.license.models import License
 from app.core.redis_client import get_redis
+from app.saas.tiers import monthly_quota_for_tier
 from app.shared.license.service import LicenseService
 from app.shared.rate_limit import RateLimiter
 
@@ -76,7 +77,7 @@ async def enforce_rate_limit(
     """Check both burst (per-minute) + monthly quota. Raises 429 if exceeded."""
     limiter = RateLimiter(redis)
     await limiter.check_burst(lic.key, settings.rate_limit_burst_per_minute)
-    quota = settings.monthly_quota_for.get(lic.tier, settings.rate_limit_free_per_month)
+    quota = monthly_quota_for_tier(lic.tier)  # -1 = unlimited
     await limiter.check_monthly(lic.key, quota)
     return lic
 
