@@ -257,6 +257,33 @@ class AdminUsageResponse(BaseModel):
     errors: list[dict] = []    # [{code, count, sample}, …]
 
 
+# ─── Token ledger (T-017) ──────────────────────────────
+
+class TokenLedgerRow(BaseModel):
+    id: int
+    timestamp: datetime
+    tenant_id: int
+    tenant_domain: str = ""     # joined from tenants table for display
+    delta: int                  # +N for credit, -N for debit
+    reason: str                 # admin_recharge | bonus | refund | purchase | usage | adjust
+    note: str = ""
+
+
+class TokenLedgerSummary(BaseModel):
+    total_credits: int = 0      # sum of positive deltas
+    total_debits: int = 0       # sum of negative deltas (as positive number)
+    net: int = 0                # credits - debits
+    transaction_count: int = 0
+
+
+class TokenLedgerResponse(BaseModel):
+    items: list[TokenLedgerRow]
+    summary: TokenLedgerSummary
+    total: int                  # total rows matching filter (for pagination)
+    limit: int
+    offset: int
+
+
 # ─── Revenue ───────────────────────────────────────────
 
 class AdminRevenueRow(BaseModel):

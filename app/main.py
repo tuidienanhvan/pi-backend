@@ -53,6 +53,7 @@ from app.admin.routers.keys import router as admin_keys_router
 from app.admin.routers.packages import router as admin_packages_router
 from app.admin.routers.audit import router as admin_audit_router
 from app.admin.routers.cron import router as admin_cron_router
+from app.admin.routers.tokens import router as admin_tokens_router
 
 # Pi AI Cloud (tokens + AI completion)
 from app.pi_ai_cloud.routers.complete import router as ai_complete_router
@@ -136,6 +137,7 @@ app.include_router(admin_keys_router,      prefix="/v1/admin", tags=["admin: key
 app.include_router(admin_packages_router,  prefix="/v1/admin", tags=["admin: packages"])
 app.include_router(admin_audit_router,     prefix="/v1/admin", tags=["admin: audit"])
 app.include_router(admin_cron_router,      prefix="/v1/admin", tags=["admin: cron"])
+app.include_router(admin_tokens_router,    prefix="/v1/admin", tags=["admin: tokens"])
 app.include_router(saas_admin_router,      prefix="/v1/admin/saas", tags=["saas: admin"])
 
 # Pi AI Cloud (primary revenue)
