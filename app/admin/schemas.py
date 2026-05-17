@@ -257,6 +257,50 @@ class AdminUsageResponse(BaseModel):
     errors: list[dict] = []    # [{code, count, sample}, …]
 
 
+# ─── AI usage drilldown (T-018) ────────────────────────
+
+class AdminUsageEventRow(BaseModel):
+    id: int
+    timestamp: datetime
+    license_id: int
+    license_key: str = ""           # joined from licenses table
+    license_email: str = ""         # joined for display
+    site_domain: str = ""
+    endpoint: str                   # e.g. "seo_bot.generate", "audit.run"
+    source: str = ""                # derived from endpoint prefix (seo/chat/audit/...)
+    tokens_input: int = 0
+    tokens_output: int = 0
+    tokens_total: int = 0           # input + output
+    cost_cents: int = 0             # upstream cost (provider charge)
+    status: str                     # success | error | rate_limited
+    latency_ms: int = 0
+    error_message: str = ""
+
+
+class AdminUsageEventsResponse(BaseModel):
+    items: list[AdminUsageEventRow]
+    total: int
+    limit: int
+    offset: int
+
+
+class AdminUsageAggregateRow(BaseModel):
+    group_key: str                  # the dimension value (e.g. provider slug, source name, license email)
+    calls: int = 0
+    tokens_total: int = 0
+    cost_cents: int = 0
+    error_count: int = 0
+    avg_latency_ms: int = 0
+
+
+class AdminUsageAggregateResponse(BaseModel):
+    dimension: str                  # "source" | "license" | "endpoint" | "status"
+    rows: list[AdminUsageAggregateRow]
+    total_calls: int = 0
+    total_tokens: int = 0
+    total_cost_cents: int = 0
+
+
 # ─── Token ledger (T-017) ──────────────────────────────
 
 class TokenLedgerRow(BaseModel):
