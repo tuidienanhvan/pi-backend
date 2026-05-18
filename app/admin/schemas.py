@@ -361,3 +361,43 @@ class AdminReleaseItem(BaseModel):
 
 class AdminReleasesResponse(BaseModel):
     items: list[AdminReleaseItem]
+
+
+# ─── Billing (T-20260518-020) ──────────────────────────
+
+class AdminSubscriptionRow(BaseModel):
+    license_id: int
+    license_key: str
+    email: str
+    customer_name: str = ""
+    plugin: str
+    tier: str
+    status: str
+    stripe_customer_id: Optional[str] = None
+    stripe_subscription_id: Optional[str] = None
+    expires_at: Optional[datetime] = None
+    created_at: datetime
+    max_sites: int = 1
+    sites_active: int = 0
+
+
+class AdminSubscriptionStats(BaseModel):
+    active: int = 0
+    cancelled: int = 0
+    expired: int = 0
+    suspended: int = 0
+    free_count: int = 0
+    pro_count: int = 0
+    max_count: int = 0
+    enterprise_count: int = 0
+    estimated_mrr_usd: float = 0.0    # pro * 29 + max * 99 (excluding enterprise)
+    stripe_linked: int = 0            # licenses with stripe_subscription_id
+    stripe_unlinked: int = 0          # paid tiers without Stripe link
+
+
+class AdminSubscriptionListResponse(BaseModel):
+    items: list[AdminSubscriptionRow]
+    stats: AdminSubscriptionStats
+    total: int
+    limit: int
+    offset: int
