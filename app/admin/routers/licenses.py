@@ -59,6 +59,31 @@ async def list_licenses(
     )
 
 
+@router.get("/licenses/{license_id}", response_model=AdminLicenseItem)
+async def get_license(
+    license_id: int,
+    admin: CurrentAdmin,  # noqa: ARG001
+    db: DbSession,
+) -> AdminLicenseItem:
+    """Fetch a single license by ID with activated_sites count.
+
+    Consumed by admin pages: LicenseDetailPage, LicenseAdjustTokensPage,
+    LicenseAssignPackagePage. Returns 404 if license not found.
+    """
+    from sqlalchemy import select, func
+    from app.shared.license.models import License, Site
+
+    lic = await db.get(License, license_id)
+    if lic is None:
+        raise HTTPException(404, "License not found")
+
+    sites_count = (await db.execute(
+        select(func.count(Site.id)).where(Site.license_id == license_id)
+    )).scalar_one()
+
+    return _to_item(lic, sites_count=sites_count)
+
+
 @router.post("/licenses", response_model=AdminLicenseItem)
 async def create_license(
     payload: AdminLicenseCreate,
