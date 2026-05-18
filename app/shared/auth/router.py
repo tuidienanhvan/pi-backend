@@ -9,7 +9,9 @@ from app.core.deps import DbSession
 from app.core.exceptions import PiException
 from app.pi_ai_cloud.models import TokenWallet
 from app.shared.schemas.responses import BaseResponse
+from app.shared.auth.deps import CurrentUser
 from app.shared.auth.schemas import (
+    ChangePasswordRequest,
     LoginRequest,
     MeResponse,
     SignupRequest,
@@ -114,6 +116,29 @@ async def logout() -> dict[str, bool]:
     """Client-side logout is sufficient (discard JWT); this endpoint exists
     purely for UX (future: blacklist token if we add one)."""
     return {"success": True}
+
+
+@router.post("/password", response_model=BaseResponse[dict])
+async def change_password(
+    req: ChangePasswordRequest,
+    user: CurrentUser,
+    db: DbSession,
+) -> BaseResponse[dict]:
+    """Change password for the authenticated user.
+
+    Verifies current password, hashes new password, persists. Does not
+    invalidate existing JWTs (stateless tokens); client may re-login if
+    they want fresh credentials.
+    """
+    svc = AuthService(db)
+    if not svc.verify_password(req.current_password, user.password_hash):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Mật khẩu hiện tại không đúng",
+        )
+    user.password_hash = svc.hash_password(req.new_password)
+    await db.flush()
+    return BaseResponse(data={"changed": True}, message="Đổi mật khẩu thành công.")
 
 
 @router.post("/register-credentials")
