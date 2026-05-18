@@ -68,6 +68,21 @@ class CronStatusResponse(BaseModel):
     jobs: list[CronJobStatus]
 
 
+class CronRunHistoryItem(BaseModel):
+    slug: str
+    status: str
+    started_at: datetime
+    duration_ms: int = 0
+    actor: str = ""
+    error: str = ""
+    result: dict = {}
+
+
+class CronRunHistoryResponse(BaseModel):
+    items: list[CronRunHistoryItem]
+    total: int
+
+
 def _next_monthly_reset() -> datetime:
     now = datetime.now(timezone.utc)
     if now.day == 1 and now.hour < 5:
@@ -157,6 +172,41 @@ async def run_cron(slug: str, admin: CurrentAdmin, db: DbSession) -> dict:
     return result
 
 
+@router.get("/cron/{slug}/history", response_model=CronRunHistoryResponse)
+async def cron_history(
+    slug: str,
+    admin: CurrentAdmin,  # noqa: ARG001
+    db: DbSession,
+    limit: int = 50,
+) -> CronRunHistoryResponse:
+    """Return recent run history for one cron job.
+
+    Stored in app_settings.cron_status["_history"] to avoid adding a table
+    while still making manual/external runs observable from Admin.
+    """
+    if slug not in {j["slug"] for j in CRON_JOBS}:
+        raise HTTPException(404, f"Unknown job '{slug}'")
+
+    raw = await _load_status(db)
+    history = raw.get("_history", {}).get(slug, [])
+    safe_limit = max(1, min(int(limit or 50), 200))
+    items = []
+    for row in history[:safe_limit]:
+        started = row.get("started_at") or row.get("last_run_at")
+        if not started:
+            continue
+        items.append(CronRunHistoryItem(
+            slug=slug,
+            status=row.get("status", "unknown"),
+            started_at=datetime.fromisoformat(started),
+            duration_ms=int(row.get("duration_ms", 0)),
+            actor=row.get("actor", ""),
+            error=row.get("error", ""),
+            result=row.get("result", {}) if isinstance(row.get("result"), dict) else {},
+        ))
+    return CronRunHistoryResponse(items=items, total=len(history))
+
+
 async def _execute_cron(slug: str, db, *, actor_label: str) -> dict:
     """Shared cron executor — used by both /run (admin) and /run-public (external)."""
     if slug not in {j["slug"] for j in CRON_JOBS}:
@@ -192,6 +242,18 @@ async def _execute_cron(slug: str, db, *, actor_label: str) -> dict:
         "last_duration_ms": duration_ms,
         "last_actor": actor_label,
     }
+    history_root = raw.setdefault("_history", {})
+    job_history = history_root.setdefault(slug, [])
+    job_history.insert(0, {
+        "slug": slug,
+        "status": status,
+        "started_at": started.isoformat(),
+        "duration_ms": duration_ms,
+        "actor": actor_label,
+        "error": error,
+        "result": result,
+    })
+    history_root[slug] = job_history[:200]
     await _save_status(db, raw)
 
     return {
