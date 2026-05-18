@@ -76,25 +76,40 @@ async def reply(
 
 @router.post("/rag/query", response_model=RagQueryResponse)
 async def rag_query(
-    req: RagQueryRequest,
-    lic: RateLimitedLicense,
+    req: RagQueryRequest,  # noqa: ARG001
+    lic: RateLimitedLicense,  # noqa: ARG001
     db: DbSession,  # noqa: ARG001
 ) -> RagQueryResponse:
-    """Query the knowledge base for relevant chunks. PLACEHOLDER — Phase 3."""
-    # TODO: real impl — pgvector or Qdrant. For now, returns empty.
-    return RagQueryResponse(success=True, chunks=[])
+    """Query the knowledge base for relevant chunks. PHASE 3 — not yet wired.
+
+    Requires pgvector or Qdrant infrastructure. Returns 501 so plugin
+    callers can detect unwired state instead of receiving silent empty success.
+    """
+    from fastapi import HTTPException
+    raise HTTPException(
+        status_code=501,
+        detail="RAG query not implemented — Phase 3 (pgvector/Qdrant pending)",
+    )
 
 
 @router.post("/kb/upload")
 async def kb_upload(lic: RateLimitedLicense) -> dict:  # noqa: ARG001
-    """Placeholder — multipart upload needs different signature."""
-    return {"success": False, "message": "Upload endpoint TBD in Phase 3"}
+    """KB document upload — PHASE 3 not yet wired."""
+    from fastapi import HTTPException
+    raise HTTPException(
+        status_code=501,
+        detail="KB upload not implemented — Phase 3 (file storage + embedding pipeline pending)",
+    )
 
 
 @router.get("/kb/list")
 async def kb_list(lic: RateLimitedLicense, db: DbSession) -> dict:  # noqa: ARG001
-    """Placeholder KB doc listing."""
-    return {"success": True, "docs": []}
+    """KB document listing — PHASE 3 not yet wired."""
+    from fastapi import HTTPException
+    raise HTTPException(
+        status_code=501,
+        detail="KB list not implemented — Phase 3 (kb_documents table pending)",
+    )
 
 
 @router.get("/status")
