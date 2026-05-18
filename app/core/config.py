@@ -86,8 +86,10 @@ class Settings(BaseSettings):
     oauth_google_client_secret: str = ""
     oauth_github_client_id: str = ""
     oauth_github_client_secret: str = ""
-    # Where to redirect after OAuth success (frontend handles JWT cookie)
-    oauth_redirect_base: str = "https://store.pi-ecosystem.com/auth/oauth/callback"
+    # OAuth callback URL on BACKEND (provider redirects here after authorize).
+    # Backend handles code exchange, then redirects to FRONTEND_STORE_URL/auth/oauth/complete.
+    # Must match the URI registered in Google/GitHub OAuth app settings.
+    oauth_redirect_base: str = "https://api.pi-ecosystem.com/v1/auth/oauth"
 
     # ─── Rate limits ──────────────────────────────────────
     # NOTE: Per-tier monthly quotas now live in `app.saas.tiers.TIER_MATRIX`
