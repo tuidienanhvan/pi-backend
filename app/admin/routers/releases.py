@@ -90,3 +90,83 @@ async def upload_release(
     db.add(release)
     await db.flush()
     return {"success": True, "id": release.id}
+
+
+# ─── Release lifecycle (T-20260518-022) ───────────────────────
+
+@router.patch("/releases/{release_id}")
+async def update_release(
+    release_id: int,
+    payload: dict,
+    admin: CurrentAdmin,  # noqa: ARG001
+    db: DbSession,
+) -> dict:
+    """Toggle is_stable / is_yanked + edit changelog (T-20260518-022).
+
+    Promote stable: PATCH { is_stable: true } — clears any other stable for
+    same plugin_slug. Yank: PATCH { is_yanked: true } — release no longer
+    served to /v1/updates/check (rollback).
+    """
+    release = await db.get(PluginRelease, release_id)
+    if release is None:
+        raise HTTPException(404, "Release not found")
+
+    if "is_stable" in payload:
+        new_stable = bool(payload["is_stable"])
+        if new_stable:
+            # Demote any other stable releases for same plugin_slug
+            others = (await db.execute(
+                select(PluginRelease).where(
+                    PluginRelease.plugin_slug == release.plugin_slug,
+                    PluginRelease.id != release_id,
+                    PluginRelease.is_stable.is_(True),
+                )
+            )).scalars().all()
+            for o in others:
+                o.is_stable = False
+        release.is_stable = new_stable
+
+    if "is_yanked" in payload:
+        release.is_yanked = bool(payload["is_yanked"])
+
+    if "changelog" in payload:
+        release.changelog = str(payload["changelog"])[:5000]
+
+    if "tier_required" in payload and payload["tier_required"] in ("free", "pro", "max", "enterprise"):
+        release.tier_required = payload["tier_required"]
+
+    await db.commit()
+    await db.refresh(release)
+
+    return {
+        "success": True,
+        "id": release.id,
+        "is_stable": release.is_stable,
+        "is_yanked": release.is_yanked,
+    }
+
+
+@router.delete("/releases/{release_id}", status_code=204)
+async def delete_release(
+    release_id: int,
+    admin: CurrentAdmin,  # noqa: ARG001
+    db: DbSession,
+) -> None:
+    """Hard-delete a release (T-20260518-022).
+
+    Removes DB row. Storage cleanup is best-effort. Use yank for soft removal.
+    """
+    release = await db.get(PluginRelease, release_id)
+    if release is None:
+        raise HTTPException(404, "Release not found")
+
+    # Best-effort: remove file from storage
+    try:
+        path = Path(settings.updates_storage_path) / release.zip_path
+        if path.exists():
+            path.unlink()
+    except Exception:  # noqa: BLE001
+        pass
+
+    await db.delete(release)
+    await db.commit()

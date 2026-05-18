@@ -268,6 +268,96 @@ async def reset_period(admin: CurrentAdmin, db: DbSession) -> dict:  # noqa: ARG
 # ─── Bulk release (T-20260513-001) ───────────────────────
 
 
+@router.get("/keys/health")
+async def keys_health(admin: CurrentAdmin, db: DbSession) -> dict:  # noqa: ARG001
+    """Aggregate health stats for the key pool (T-20260518-019).
+
+    Returns counts by status + health badge groups. Used by admin dashboard
+    to show "X keys at risk" warnings.
+    """
+    from sqlalchemy import func
+    stmt = select(AiProviderKey.status, AiProviderKey.health_status, func.count(AiProviderKey.id))
+    stmt = stmt.group_by(AiProviderKey.status, AiProviderKey.health_status)
+    rows = (await db.execute(stmt)).all()
+
+    by_status: dict[str, int] = {}
+    by_health: dict[str, int] = {}
+    total = 0
+    near_exhausted = 0  # > 90% of monthly quota
+    failing = 0          # health_status = degraded or down
+
+    for status, health, count in rows:
+        by_status[status or "unknown"] = by_status.get(status or "unknown", 0) + count
+        by_health[health or "unknown"] = by_health.get(health or "unknown", 0) + count
+        total += count
+        if health in ("degraded", "down"):
+            failing += count
+
+    # Near-exhausted keys (separate query — group not viable)
+    near_stmt = select(func.count(AiProviderKey.id)).where(
+        AiProviderKey.monthly_quota_tokens > 0,
+        AiProviderKey.monthly_used_tokens >= AiProviderKey.monthly_quota_tokens * 0.9,
+    )
+    near_exhausted = (await db.execute(near_stmt)).scalar_one()
+
+    return {
+        "total": total,
+        "by_status": by_status,
+        "by_health": by_health,
+        "near_exhausted": int(near_exhausted),
+        "failing": int(failing),
+    }
+
+
+@router.post("/keys/{key_id}/rotate", response_model=AdminKeyItem)
+async def rotate_key(
+    key_id: int,
+    payload: dict,
+    admin: CurrentAdmin,
+    db: DbSession,
+    request: Request,
+) -> AdminKeyItem:
+    """Rotate a key (T-20260518-019).
+
+    Marks the existing key as revoked + creates a new key inheriting allocation.
+    Payload: { new_key_value: str, label?: str }
+    """
+    old = await db.get(AiProviderKey, key_id)
+    if old is None:
+        raise HTTPException(404, "Key not found")
+    new_value = (payload or {}).get("new_key_value", "").strip()
+    if not new_value:
+        raise HTTPException(400, "new_key_value is required")
+
+    # Create new key inheriting allocation + quota
+    new_key = AiProviderKey(
+        provider_id=old.provider_id,
+        label=(payload or {}).get("label") or f"{old.label} (rotated)",
+        key_value=new_value,
+        status="active",
+        health_status="healthy",
+        allocated_to_license_id=old.allocated_to_license_id,
+        allocated_at=old.allocated_at,
+        monthly_quota_tokens=old.monthly_quota_tokens,
+        monthly_used_tokens=0,
+        notes=f"Rotated from key #{old.id} on {datetime.now(timezone.utc).isoformat()}",
+    )
+    db.add(new_key)
+    old.status = "revoked"
+    old.notes = (old.notes or "") + f" | Rotated to new key on {datetime.now(timezone.utc).isoformat()}"
+    await db.commit()
+    await db.refresh(new_key)
+
+    await AuditLogger.log(
+        db, actor_id=admin.id, actor_email=admin.email,
+        action="rotate", resource_type="key", resource_id=key_id,
+        resource_label=f"key #{key_id}",
+        message=f"Rotated key #{key_id} → new key #{new_key.id}",
+        **_req_ctx(request),
+    )
+    return await _to_item(db, new_key)
+
+
 @router.post("/licenses/{license_id}/keys/release-all", status_code=200)
 async def release_all_keys_for_license(
     license_id: int, admin: CurrentAdmin, db: DbSession, request: Request,
