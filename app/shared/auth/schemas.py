@@ -22,6 +22,20 @@ class ChangePasswordRequest(BaseModel):
     new_password: str = Field(..., min_length=8, max_length=200)
 
 
+class ForgotPasswordRequest(BaseModel):
+    email: str = Field(..., max_length=255)
+
+
+class ResetPasswordRequest(BaseModel):
+    token: str = Field(..., min_length=10, max_length=2048)
+    new_password: str = Field(..., min_length=8, max_length=200)
+
+
+class OAuthCallbackRequest(BaseModel):
+    code: str = Field(..., min_length=1, max_length=2048)
+    state: str = Field("", max_length=2048)
+
+
 class UserPublic(BaseModel):
     id: int
     email: str = Field(..., max_length=255)

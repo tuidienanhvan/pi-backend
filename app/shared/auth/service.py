@@ -72,6 +72,30 @@ class AuthService:
         except JWTError as e:
             raise PiException(401, "invalid_token", f"JWT decode failed: {e}") from e
 
+    # ─── Password reset (stateless JWT — no DB storage needed) ──
+    @staticmethod
+    def create_password_reset_token(user: User, ttl_minutes: int = 15) -> str:
+        """Short-lived JWT with purpose=password_reset. No DB row required."""
+        now = datetime.now(timezone.utc)
+        payload = {
+            "sub": str(user.id),
+            "email": user.email,
+            "purpose": "password_reset",
+            "iat": int(now.timestamp()),
+            "exp": int((now + timedelta(minutes=ttl_minutes)).timestamp()),
+        }
+        return jwt.encode(payload, settings.jwt_secret, algorithm=settings.jwt_algorithm)
+
+    @staticmethod
+    def verify_password_reset_token(token: str) -> dict[str, Any]:
+        try:
+            payload = jwt.decode(token, settings.jwt_secret, algorithms=[settings.jwt_algorithm])
+        except JWTError as e:
+            raise PiException(400, "invalid_reset_token", f"Token invalid or expired: {e}") from e
+        if payload.get("purpose") != "password_reset":
+            raise PiException(400, "wrong_token_purpose", "Token purpose mismatch")
+        return payload
+
     # ─── User CRUD ──────────────────────────────────────
     async def get_by_id(self, user_id: int) -> User | None:
         return await self.db.get(User, user_id)

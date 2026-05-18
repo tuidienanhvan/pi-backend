@@ -64,6 +64,31 @@ class Settings(BaseSettings):
     google_psi_api_key: str = ""  # public free tier: 25K/day without key
     google_indexing_service_account_json: str = ""  # path to JSON credential
 
+    # ─── Email (Resend primary, SMTP fallback) ──────────────────
+    # Resend.com: 3,000 emails/month free, modern API
+    resend_api_key: str = ""
+    email_from: str = "Pi Ecosystem <noreply@pi-ecosystem.com>"
+    email_reply_to: str = ""
+
+    # SMTP fallback (Gmail/Brevo/Mailtrap) — used when resend_api_key empty
+    smtp_host: str = ""
+    smtp_port: int = 587
+    smtp_user: str = ""
+    smtp_password: str = ""
+    smtp_use_tls: bool = True
+
+    # Frontend URLs for reset/verification email links
+    frontend_store_url: str = "https://store.pi-ecosystem.com"
+    frontend_dashboard_url: str = "https://app.pi-ecosystem.com"
+
+    # ─── OAuth (Google + GitHub) ────────────────────────────
+    oauth_google_client_id: str = ""
+    oauth_google_client_secret: str = ""
+    oauth_github_client_id: str = ""
+    oauth_github_client_secret: str = ""
+    # Where to redirect after OAuth success (frontend handles JWT cookie)
+    oauth_redirect_base: str = "https://store.pi-ecosystem.com/auth/oauth/callback"
+
     # ─── Rate limits ──────────────────────────────────────
     # NOTE: Per-tier monthly quotas now live in `app.saas.tiers.TIER_MATRIX`
     # (single source of truth). The `rate_limit_*_per_month` env vars are

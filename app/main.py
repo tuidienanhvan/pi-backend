@@ -29,6 +29,7 @@ from app.core.redis_client import close_redis
 
 # Shared
 from app.shared.auth.router import router as auth_router
+from app.shared.auth.oauth import router as auth_oauth_router
 from app.shared.health import router as health_router
 from app.shared.license.router import router as license_router
 from app.shared.telemetry.router import router as telemetry_router
@@ -116,6 +117,7 @@ app.add_middleware(
 register_exception_handlers(app)
 app.include_router(health_router, tags=["health"])
 app.include_router(auth_router,      prefix="/v1/auth",      tags=["shared: auth"])
+app.include_router(auth_oauth_router, prefix="/v1/auth",      tags=["shared: oauth + reset"])
 app.include_router(license_router,   prefix="/v1/license",   tags=["shared: license"])
 app.include_router(updates_router,   prefix="/v1/updates",   tags=["shared: updates"])
 app.include_router(telemetry_router, prefix="/v1/telemetry", tags=["shared: telemetry"])
