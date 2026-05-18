@@ -56,7 +56,9 @@ def _apply_filters(stmt, tenant_id: int, reason: str, date_from: str, date_to: s
     elif delta_sign == "debit":
         stmt = stmt.where(TokenTransaction.delta < 0)
     if q:
-        stmt = stmt.where(TokenTransaction.note.ilike(f"%{q}%"))
+        # Escape LIKE wildcards in user input to prevent pattern injection.
+        safe_q = q.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+        stmt = stmt.where(TokenTransaction.note.ilike(f"%{safe_q}%", escape="\\"))
     return stmt
 
 

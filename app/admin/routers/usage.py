@@ -71,7 +71,9 @@ def _apply_filters(
     if status:
         stmt = stmt.where(UsageLog.status == status)
     if endpoint:
-        stmt = stmt.where(UsageLog.endpoint.ilike(f"%{endpoint}%"))
+        # Escape LIKE wildcards in user input to prevent pattern injection.
+        safe_ep = endpoint.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+        stmt = stmt.where(UsageLog.endpoint.ilike(f"%{safe_ep}%", escape="\\"))
     if source:
         # Source = endpoint head prefix; reverse-map by ilike on prefix.
         # e.g. source="seo" matches endpoints starting with seo_bot/audit/schema.
