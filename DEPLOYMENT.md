@@ -89,6 +89,41 @@ docker compose logs -f api  # tail
 - **Upstash**: free tier as above; cap will trigger if traffic spikes.
 - **Vercel**: free tier covers hobby projects; SPA + minimal serverless usually fits.
 
+## Production toggles to verify
+
+Before going live, ensure these mock/dev-mode switches are disabled:
+
+### Mock modes that MUST be disabled in production
+
+| Env var / Config | File / Location | Purpose | Production setting |
+|---|---|---|---|
+| `VITE_MOCK_AUTH` | pi-store-webapp/.env.production | Bypass real auth — accepts any email | **Must be unset or `0`** |
+| `PI_API_MOCK_MODE` | plugins/pi-api — wp-config.php or .env | Mock all BackendClient responses | **Must be `false` or unset** |
+| `VITE_USE_MOCK` | pi-dashboard-webapp/.env.production | Use mock API responses | **Must be unset** |
+| `VITE_DEMO_MODE` | pi-store-webapp/.env | Simulate Stripe checkout flow | **Must be unset** |
+
+### Feature flags
+
+| Env var | File / Location | Purpose | Production setting |
+|---|---|---|---|
+| `PI_AI_NEW_ROUTING_ENABLED` | Railway env → pi-backend | Enable per-package AI provider routing | **Set `true` once routing policies configured** |
+| `GOOGLE_INDEXING_SERVICE_ACCOUNT_JSON` | Railway env → pi-backend | Path or inline JSON for Google service account | **Set to service account JSON when ready** |
+
+### Endpoints with dev-only behavior
+
+- `POST /v1/billing/subscribe/simulate-success` — Development-only Stripe simulation. **Guarded**: returns 404 in production (`app_env == "production"`).
+- `POST /v1/admin/licenses` — Creates real license keys. No dev guard needed (requires admin JWT).
+
+### Checklist
+
+1. [ ] Set `APP_ENV=production` on Railway
+2. [ ] Unset `PI_API_MOCK_MODE` in wp-config.php
+3. [ ] Unset `VITE_MOCK_AUTH` and `VITE_DEMO_MODE` in Vercel env
+4. [ ] Unset `VITE_USE_MOCK` in Vercel env for pi-dashboard
+5. [ ] Configure `GOOGLE_INDEXING_SERVICE_ACCOUNT_JSON` if using instant indexing
+6. [ ] Set `PI_AI_NEW_ROUTING_ENABLED=true` after configuring provider routing policies
+7. [ ] Verify `/health` endpoint returns OK on Railway
+
 ## Future considerations
 
 - Pi backend cold start: alembic + uvicorn ~15-25s on first deploy after schema changes; healthcheck timeout set to 300s.

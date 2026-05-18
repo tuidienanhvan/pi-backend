@@ -1,12 +1,8 @@
 """POST /v1/seo/indexing/submit — submit URL to Google Indexing API.
 
-TODO: Google Indexing API requires a service-account JSON credential and
-the site owner verified in Google Search Console. This implementation is
-scaffolded — admin must upload the service-account JSON via /admin/settings
-before live submissions work.
-
-For now: returns a stub success + queues the URL in a Redis list so admin
-can see what would be submitted.
+Attempts real submission via Google Indexing API when service account
+credentials are configured (GOOGLE_INDEXING_SERVICE_ACCOUNT_JSON).
+Always queues to Redis for audit regardless of submission outcome.
 """
 
 from datetime import datetime, timezone
@@ -27,7 +23,7 @@ class IndexingSubmitRequest(BaseModel):
 class IndexingSubmitResponse(BaseModel):
     url: str
     action: str
-    status: str  # "queued" | "submitted" | "failed"
+    status: str  # "submitted" | "queued" | "failed"
     message: str = ""
     submitted_at: datetime
 
@@ -35,40 +31,62 @@ class IndexingSubmitResponse(BaseModel):
 @router.post("/submit", response_model=IndexingSubmitResponse)
 async def indexing_submit(
     payload: IndexingSubmitRequest,
-    lic: CurrentLicense,  # noqa: ARG001
+    lic: CurrentLicense,
 ) -> IndexingSubmitResponse:
-    """Queue a URL for Google Indexing API submission.
+    """Submit a URL to the Google Indexing API.
 
-    Live path (not yet implemented):
-      1. Load service-account JSON from settings (Pi team uploads once)
-      2. Generate JWT, exchange for access token
-      3. POST https://indexing.googleapis.com/v3/urlNotifications:publish
-           {"url": "...", "type": "URL_UPDATED"}
-      4. Parse response, return success/failure
-
-    Current stub: logs to Redis list `seo_indexing_queue` so admin can audit.
+    1. Attempt real Google Indexing API submission via service account
+    2. Queue to Redis `seo_indexing_queue` for admin audit (always)
+    3. Return submission result
     """
     now = datetime.now(timezone.utc)
+    status = "queued"
+    message = ""
 
+    # --- Step 1: Try real Google Indexing API submission ---
+    from app.pi_seo.services.google_indexing import submit_to_google
+
+    result = await submit_to_google(payload.url, payload.action)
+
+    if result.get("submitted"):
+        status = "submitted"
+        message = "URL submitted to Google Indexing API successfully."
+    elif "not configured" in result.get("error", ""):
+        status = "queued"
+        message = (
+            "Google service-account not configured. URL queued for manual submission. "
+            "Set GOOGLE_INDEXING_SERVICE_ACCOUNT_JSON to enable real submissions."
+        )
+    else:
+        status = "failed"
+        message = f"Google API error: {result.get('error', 'Unknown')}"
+
+    # --- Step 2: Always queue to Redis for audit ---
     try:
         from app.core.redis_client import get_redis
         import json
+
         redis_client = await get_redis()
         await redis_client.lpush(
             "seo_indexing_queue",
             json.dumps({
-                "url": payload.url, "action": payload.action,
-                "license_id": lic.id, "queued_at": now.isoformat(),
+                "url": payload.url,
+                "action": payload.action,
+                "license_id": lic.id,
+                "status": status,
+                "queued_at": now.isoformat(),
+                "google_response": result.get("response") if result.get("submitted") else None,
+                "error": result.get("error") if not result.get("submitted") else None,
             }),
         )
-        await redis_client.ltrim("seo_indexing_queue", 0, 999)  # keep last 1000
+        await redis_client.ltrim("seo_indexing_queue", 0, 999)
     except Exception:  # noqa: BLE001
         pass
 
     return IndexingSubmitResponse(
         url=payload.url,
         action=payload.action,
-        status="queued",
-        message="URL queued. Live submission requires Google service-account JSON (admin setup pending).",
+        status=status,
+        message=message,
         submitted_at=now,
     )

@@ -65,8 +65,14 @@ async def simulate_subscription_success(
     ctx: Annotated[TenantContext, Depends(get_tenant)],
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> dict[str, bool]:
-    """Bypass Stripe and activate a tier immediately (for demo/dev only)."""
-    if os.getenv("APP_ENV") != "development" and os.getenv("DEMO_MODE") != "true":
+    """Bypass Stripe and activate a tier immediately (for demo/dev only).
+
+    Returns 404 in production to hide the endpoint entirely.
+    """
+    from app.core.config import settings as _settings
+    if _settings.app_env == "production":
+        raise HTTPException(404, "Not found")
+    if os.getenv("APP_ENV") not in ("development", "test") and os.getenv("DEMO_MODE") != "true":
         raise HTTPException(403, "Simulation mode is not enabled")
 
     # Mock Stripe Session object for handle_checkout_completed

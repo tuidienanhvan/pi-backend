@@ -185,3 +185,92 @@ async def billing_stats(
 ) -> AdminSubscriptionStats:
     """Quick stats card data without paginated list."""
     return await _compute_stats(db, "", "", "", "")
+
+
+@router.get("/billing/cost-margin")
+async def cost_margin(
+    db: DbSession,
+    admin: CurrentAdmin,  # noqa: ARG001
+    days: int = Query(30, ge=1, le=365),
+) -> dict:
+    """Aggregate AI cost vs revenue per license over the last N days.
+
+    Returns per-customer rows with token usage, pi_tokens_charged,
+    upstream_cost_cents, and estimated revenue (tier × canonical price).
+    """
+    from datetime import timedelta, timezone
+
+    since = datetime.now(timezone.utc) - timedelta(days=days)
+
+    # Try to query AI usage table — if it doesn't exist (early stage), graceful fallback
+    try:
+        from app.pi_ai_cloud.models import AiUsage
+
+        stmt = (
+            select(
+                License.id,
+                License.email,
+                License.customer_name,
+                License.tier,
+                License.plugin,
+                func.coalesce(func.sum(AiUsage.input_tokens + AiUsage.output_tokens), 0).label("total_tokens"),
+                func.coalesce(func.sum(AiUsage.pi_tokens_charged), 0).label("pi_charge"),
+                func.coalesce(func.sum(AiUsage.upstream_cost_cents), 0).label("upstream_cost_cents"),
+            )
+            .join(AiUsage, AiUsage.license_id == License.id, isouter=True)
+            .where(
+                (AiUsage.created_at >= since) | (AiUsage.created_at.is_(None))
+            )
+            .where(License.status == "active")
+            .group_by(License.id)
+            .order_by(
+                (func.coalesce(func.sum(AiUsage.pi_tokens_charged), 0)
+                 - func.coalesce(func.sum(AiUsage.upstream_cost_cents), 0)).desc()
+            )
+        )
+
+        rows = (await db.execute(stmt)).all()
+    except Exception:
+        # AiUsage table might not exist in early-stage deployments
+        rows = []
+
+    items = []
+    total_revenue = 0
+    total_upstream = 0
+    total_tokens = 0
+
+    for row in rows:
+        monthly_revenue_cents = _TIER_PRICE_USD.get(row.tier, 0) * 100
+        upstream = int(row.upstream_cost_cents or 0)
+        tokens = int(row.total_tokens or 0)
+        margin_cents = monthly_revenue_cents - upstream
+
+        total_revenue += monthly_revenue_cents
+        total_upstream += upstream
+        total_tokens += tokens
+
+        items.append({
+            "license_id": row.id,
+            "email": row.email,
+            "customer_name": row.customer_name or "",
+            "tier": row.tier,
+            "plugin": row.plugin,
+            "total_tokens": tokens,
+            "pi_charge": int(row.pi_charge or 0),
+            "upstream_cost_cents": upstream,
+            "revenue_cents": monthly_revenue_cents,
+            "margin_cents": margin_cents,
+        })
+
+    return {
+        "window_days": days,
+        "summary": {
+            "total_revenue_cents": total_revenue,
+            "total_upstream_cents": total_upstream,
+            "total_margin_cents": total_revenue - total_upstream,
+            "margin_percent": round((total_revenue - total_upstream) / max(1, total_revenue) * 100, 1),
+            "total_tokens": total_tokens,
+            "customer_count": len(items),
+        },
+        "items": items,
+    }

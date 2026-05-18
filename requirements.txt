@@ -25,3 +25,4 @@ python-slugify>=8.0.4
 orjson>=3.10.0
 tenacity>=9.0.0
 stripe>=10.0.0
+google-auth>=2.36.0
