@@ -222,10 +222,63 @@ async def _execute_cron(slug: str, db, *, actor_label: str) -> dict:
             count = await KeyAllocator(db).reset_monthly_counters()
             result = {"reset_count": count}
         elif slug == "health_check":
-            # Placeholder — full impl would ping each provider.
-            result = {"note": "Health check placeholder — wire into ProviderRouter.ping_all()"}
+            # Provider health survey — aggregate status + mark stale providers
+            # as degraded. Real per-provider API ping would burn tokens, so we
+            # observe state instead. Providers self-update via mark_success /
+            # mark_failure during real traffic; this job catches abandoned ones.
+            from sqlalchemy import select
+            from datetime import timedelta
+            from app.pi_ai_cloud.models import AiProvider
+
+            stale_cutoff = datetime.now(timezone.utc) - timedelta(hours=24)
+            providers = (await db.execute(
+                select(AiProvider).where(AiProvider.is_enabled.is_(True))
+            )).scalars().all()
+
+            stale_count = 0
+            counts = {"healthy": 0, "degraded": 0, "down": 0, "unknown": 0}
+            for p in providers:
+                if (
+                    p.health_status == "healthy"
+                    and p.last_success_at
+                    and p.last_success_at < stale_cutoff
+                ):
+                    p.health_status = "degraded"
+                    stale_count += 1
+                counts[p.health_status] = counts.get(p.health_status, 0) + 1
+
+            if stale_count:
+                await db.flush()
+
+            result = {
+                "providers_surveyed": len(providers),
+                "by_status": counts,
+                "marked_stale": stale_count,
+            }
         elif slug == "usage_rollup":
-            result = {"note": "Usage rollup placeholder — no daily_usage_rollup table yet"}
+            # Last-24h aggregate from ai_usage table (no migration needed —
+            # compute on demand instead of materialised daily_usage_rollup).
+            from sqlalchemy import select, func as sa_func
+            from datetime import timedelta
+            from app.pi_ai_cloud.models import AiUsage
+
+            since = datetime.now(timezone.utc) - timedelta(days=1)
+            row = (await db.execute(
+                select(
+                    sa_func.count(AiUsage.id),
+                    sa_func.coalesce(sa_func.sum(AiUsage.input_tokens + AiUsage.output_tokens), 0),
+                    sa_func.coalesce(sa_func.sum(AiUsage.pi_tokens_charged), 0),
+                    sa_func.coalesce(sa_func.sum(AiUsage.upstream_cost_cents), 0),
+                ).where(AiUsage.created_at >= since)
+            )).one()
+
+            result = {
+                "window": "last_24h",
+                "calls": int(row[0] or 0),
+                "upstream_tokens": int(row[1] or 0),
+                "pi_tokens_charged": int(row[2] or 0),
+                "upstream_cost_cents": int(row[3] or 0),
+            }
     except Exception as exc:  # noqa: BLE001
         status = "failed"
         error = str(exc)[:500]
